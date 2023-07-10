@@ -1,6 +1,4 @@
-import 'package:amnesiac_music_player/pages/artists.dart';
-
-import '../imports.dart';
+import 'package:amnesia_music_player/globals.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,6 +15,24 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     AppStyles.initStyles(theme);
 
+    final page;
+    switch(selectedIndex) {
+      case 0:
+        page = const ArtistsPage();
+        break;
+      case 1:
+        page = const CollectionsPage();
+        break;
+      case 2:
+        page = const TracklistPage();
+        break;
+      case 3:
+        page = const ContentPlayerPage();
+        break;
+      default:
+        page = const ArtistsPage();
+    }
+
     return Scaffold(
       body: Row(
         children: [
@@ -29,19 +45,19 @@ class _HomePageState extends State<HomePage> {
               extended: true,
               destinations: [
                 NavigationRailDestination(
-                  icon: Icon(Icons.mic_external_on),
+                  icon: const Icon(Icons.mic_external_on),
                   label: Text('Artists', style: AppStyles.mediumText),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.library_music),
+                  icon: const Icon(Icons.library_music),
                   label: Text('Collections', style: AppStyles.mediumText),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.queue_music),
+                  icon: const Icon(Icons.queue_music),
                   label: Text('Tracklist', style: AppStyles.mediumText),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.play_arrow_rounded),
+                  icon: const Icon(Icons.play_arrow_rounded),
                   label: Text('Content Player', style: AppStyles.mediumText),
                 ),
               ],
@@ -54,7 +70,7 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: Container(
               color: theme.colorScheme.primaryContainer,
-              child: const ArtistsPage(),
+              child: page,
             ),
           ),
         ],

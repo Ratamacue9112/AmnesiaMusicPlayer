@@ -1,9 +1,15 @@
 import 'package:provider/provider.dart';
 
-import 'imports.dart';
+import 'package:amnesia_music_player/globals.dart';
 
 void main() {
   runApp(const App());
+
+  final appDataDirectory = Directory(Globals.appDataPath);
+
+  if(!appDataDirectory.existsSync()) {
+    appDataDirectory.createSync();
+  }
 }
 
 class App extends StatelessWidget {
