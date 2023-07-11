@@ -12,12 +12,15 @@ export 'pages/content_player.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
+import 'packages/context_menus.dart';
 
 class AppStyles {
   static TextStyle mediumText = const TextStyle();
   static TextStyle mediumTextSecondary = const TextStyle();
   static TextStyle largeText = const TextStyle();
   static TextStyle titleText = const TextStyle();
+  
+  static ContextMenuButtonStyle contextMenuStyle = const ContextMenuButtonStyle();
 
   static void initStyles(ThemeData theme) {
     mediumText = theme.textTheme.bodyMedium!.copyWith(
@@ -31,6 +34,12 @@ class AppStyles {
     );
     titleText = theme.textTheme.headlineLarge!.copyWith(
       color: theme.colorScheme.onPrimary,
+    );
+
+    contextMenuStyle = ContextMenuButtonStyle(
+      fgColor: theme.colorScheme.onSecondary,
+      bgColor: theme.colorScheme.secondaryContainer,
+      hoverFgColor: theme.colorScheme.onPrimary
     );
   }
 }
