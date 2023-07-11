@@ -5,9 +5,9 @@ class TracklistPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: Text('Tracklist Page')
+        child: Text('Tracklist Page', style: AppStyles.mediumText)
       )
     );
   }

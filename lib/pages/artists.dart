@@ -1,3 +1,4 @@
+import 'package:amnesia_music_player/packages/file_picker.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:amnesia_music_player/globals.dart';
@@ -14,6 +15,8 @@ class _ArtistsPageState extends State<ArtistsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+  
     updateArtists();
 
     return Scaffold(
@@ -24,13 +27,21 @@ class _ArtistsPageState extends State<ArtistsPage> {
         padding: const EdgeInsets.all(12.0),
         children: [
           for(MapEntry<String, ImageProvider> item in artists.entries)
-            ArtistProfile(name: item.key, image: item.value)
+            ArtistProfile(item.key, item.value),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        
-      )
-    );
+        onPressed: () {
+          showDialog(context: context, builder: (context) {
+            return CreateArtistDialog(updatePage: () {
+              updateArtists();
+            });
+          });
+        },
+        tooltip: 'Add Artist',
+        backgroundColor: theme.colorScheme.secondaryContainer,
+        child: const Icon(Icons.add))
+      );
   }
 
   void updateArtists() {
@@ -65,7 +76,7 @@ class ArtistProfile extends StatelessWidget {
   final ImageProvider image;
   final String name;
 
-  const ArtistProfile({required this.name, required this.image, super.key});
+  const ArtistProfile(this.name, this.image, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +90,7 @@ class ArtistProfile extends StatelessWidget {
               shape: BoxShape.circle,
               image: DecorationImage(
                 image: image,
-                fit: BoxFit.fill
+                fit: BoxFit.contain
               ),
             ),
           ),
@@ -88,5 +99,159 @@ class ArtistProfile extends StatelessWidget {
         Text(name, style: AppStyles.largeText), 
       ]
     );
+  }
+}
+
+class CreateArtistDialog extends StatefulWidget {
+  final Function() updatePage;
+
+  const CreateArtistDialog({required this.updatePage, super.key});
+
+  @override
+  State<CreateArtistDialog> createState() => _CreateArtistDialogState();
+}
+
+class _CreateArtistDialogState extends State<CreateArtistDialog> {
+  String currentIconFilePath = '-';
+  String currentCreateArtistError = '';
+  String currentArtistName = '';
+  ImageProvider artistImage = const AssetImage('assets/images/default_artist_icon.png');
+
+  TextEditingController nameController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return StatefulBuilder(builder: (stfContext, stfSetState) {
+      return Dialog(
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Column(
+          children: [
+            //Title
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Text('Add Artist', style: AppStyles.titleText),
+            ),
+            //Name text field
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: theme.colorScheme.secondaryContainer,
+                  hintText: 'Enter artist name here',
+                ),
+                controller: nameController,
+                onChanged: (value) => {
+                  stfSetState(() {
+                    currentArtistName = value;
+                  })
+                },
+              ),
+            ),
+            //Select icon
+            Center(
+              child: Column(
+                children: [
+                  Text(currentIconFilePath == '-' ? 'No path selected' : currentIconFilePath, style: AppStyles.largeText),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                    onPressed: () async {
+                      FilePickerResult? result = await FilePicker.platform.pickFiles(
+                        dialogTitle: 'Select artist icon',
+                        type: FileType.image
+                      );
+                      if(result != null) {
+                        stfSetState(() {
+                          currentIconFilePath = result.files.single.path!;
+                          artistImage = FileImage(File(currentIconFilePath));
+                        });
+                      }
+                    }, 
+                    child: Text('Select Icon', style: AppStyles.mediumTextSecondary)
+                  )
+                ],
+              ),
+            ),
+            //Artist profile preview
+            const Spacer(),
+            Center(
+              child: SizedBox(
+                width: 200,
+                height: 200,
+                child: ArtistProfile(currentArtistName == '' ? 'Artist name here' : currentArtistName, artistImage)
+              ),
+            ),
+            //Cancel or create
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                children: [
+                  Text(currentCreateArtistError, style: AppStyles.largeText.copyWith(color: Colors.red)),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          }, 
+                          child: Text('Cancel', style: AppStyles.mediumTextSecondary)
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        flex: 5,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                          onPressed: () {
+                            if(currentArtistName == '') {
+                              stfSetState(() {
+                                currentCreateArtistError = 'You need to give the artist a name!';
+                              });
+                              return;
+                            }
+
+                            Directory dir = Directory(path.join(Globals.appDataPath, '--$currentArtistName--'));
+                            if(dir.existsSync()) {
+                              stfSetState(() {
+                                currentCreateArtistError = 'There is already an artist of this name!';
+                              });
+                              return;
+                            }
+
+                            dir.createSync();
+                            if(currentIconFilePath != '-') {
+                              File(currentIconFilePath).copySync(path.join(dir.path, 'icon.png'));
+                            }
+
+                            Directory(path.join(dir.path, 'songs')).createSync();
+                            Directory(path.join(dir.path, 'collections')).createSync();
+
+                            widget.updatePage();
+                            Navigator.pop(context);
+                          }, 
+                          child: Text('Create', style: AppStyles.mediumTextSecondary)
+                        ),
+                      )
+                    ],
+                  )
+                ],
+              )
+            )
+          ]
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    super.dispose();
   }
 }

@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/src/file_picker_io.dart';
-import 'package:file_picker/src/file_picker_macos.dart';
-import 'package:file_picker/src/file_picker_result.dart';
-import 'package:file_picker/src/linux/file_picker_linux.dart';
-import 'package:file_picker/src/windows/stub.dart'
-    if (dart.library.io) 'package:file_picker/src/windows/file_picker_windows.dart';
-import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'file_picker_io.dart';
+import 'file_picker_macos.dart';
+import 'file_picker_result.dart';
+import 'linux/file_picker_linux.dart';
+import 'windows/stub.dart'
+    if (dart.library.io) 'windows/file_picker_windows.dart';
+import '../plugin_platform_interface.dart';
 
 const String defaultDialogTitle = '';
 

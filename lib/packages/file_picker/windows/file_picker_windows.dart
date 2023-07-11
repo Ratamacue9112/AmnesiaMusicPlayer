@@ -4,10 +4,10 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import '../file_picker.dart';
+import '../../file_picker.dart';
 import '../utils.dart';
 import '../exceptions.dart';
-import 'file_picker_windows_ffi_types.dart';
+import 'package:amnesia_music_player/packages/file_picker/windows/file_picker_windows_ffi_types.dart';
 import 'package:path/path.dart';
 import 'package:win32/win32.dart';
 
@@ -114,7 +114,7 @@ class FilePickerWindows extends FilePicker {
     if (!SUCCEEDED(hr)) throw WindowsException(hr);
     free(title);
 
-    // TODO: figure out how to set the initial directory via SetDefaultFolder / SetFolder
+    // igure out how to set the initial directory via SetDefaultFolder / SetFolder
     // if (initialDirectory != null) {
     //   final folder = TEXT(initialDirectory);
     //   final riid = calloc<COMObject>();
@@ -293,7 +293,7 @@ class FilePickerWindows extends FilePicker {
   }
 
   Pointer<OPENFILENAMEW> _instantiateOpenFileNameW(_OpenSaveFileArgs args) {
-    final lpstrFileBufferSize = 8192 * maximumPathLength;
+    const lpstrFileBufferSize = 8192 * maximumPathLength;
     final Pointer<OPENFILENAMEW> openFileNameW = calloc<OPENFILENAMEW>();
 
     openFileNameW.ref.lStructSize = sizeOf<OPENFILENAMEW>();

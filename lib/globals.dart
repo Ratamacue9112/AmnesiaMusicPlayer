@@ -15,14 +15,22 @@ import 'package:flutter/material.dart';
 
 class AppStyles {
   static TextStyle mediumText = const TextStyle();
+  static TextStyle mediumTextSecondary = const TextStyle();
   static TextStyle largeText = const TextStyle();
+  static TextStyle titleText = const TextStyle();
 
   static void initStyles(ThemeData theme) {
     mediumText = theme.textTheme.bodyMedium!.copyWith(
       color: theme.colorScheme.onPrimary
     );
+    mediumTextSecondary = theme.textTheme.bodyMedium!.copyWith(
+      color: theme.colorScheme.onSecondary
+    );
     largeText = theme.textTheme.bodyLarge!.copyWith(
       color: theme.colorScheme.onPrimary
+    );
+    titleText = theme.textTheme.headlineLarge!.copyWith(
+      color: theme.colorScheme.onPrimary,
     );
   }
 }

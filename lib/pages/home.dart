@@ -15,7 +15,7 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     AppStyles.initStyles(theme);
 
-    final page;
+    final Widget page;
     switch(selectedIndex) {
       case 0:
         page = const ArtistsPage();

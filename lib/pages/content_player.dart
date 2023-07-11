@@ -5,9 +5,9 @@ class ContentPlayerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: Text('Content Player Page')
+        child: Text('Content Player Page', style: AppStyles.mediumText)
       )
     );
   }

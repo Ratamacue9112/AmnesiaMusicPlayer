@@ -13,7 +13,7 @@ void main() {
 }
 
 class App extends StatelessWidget {
-  const App({super.key});
+     const App({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +27,9 @@ class App extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color.fromARGB(255, 65, 65, 65),
             primaryContainer: const Color.fromARGB(255, 97, 97, 97),
-            secondaryContainer: const Color.fromARGB(255, 156, 156, 156) ,
-            onPrimary: Colors.white
+            secondaryContainer: const Color.fromARGB(255, 156, 156, 156),
+            onPrimary: Colors.white,
+            onSecondary: Colors.black
           ),
           scaffoldBackgroundColor: const Color.fromARGB(255, 88, 88, 88)
         ),
