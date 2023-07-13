@@ -24,13 +24,14 @@ class _ArtistsPageState extends State<ArtistsPage> {
       buttonStyle: AppStyles.contextMenuStyle,
       child: Scaffold(
         body: GridView.extent(
-          maxCrossAxisExtent: 200.0,
+          maxCrossAxisExtent: 300.0,
           mainAxisSpacing: 8.0,
           crossAxisSpacing: 8.0,
           padding: const EdgeInsets.all(12.0),
           children: [
             for(MapEntry<String, ImageProvider> item in artists.entries)
               ContextMenuRegion(
+                enableLongPress: false,
                 contextMenu: ArtistProfileContextMenu(item.key, updatePage: () {
                   updateArtists();
                 }),
@@ -89,24 +90,35 @@ class ArtistProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              image: DecorationImage(
-                image: image,
-                fit: BoxFit.contain
+    AppState appState = context.watch<AppState>();
+
+    return InkWell(
+      onTap: () {
+        appState.selectedArtist = name;
+        appState.goToPage(1);
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: image,
+                    fit: BoxFit.contain
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 5),
+            Text(name, style: AppStyles.largeText), 
+          ]
         ),
-        const SizedBox(height: 5),
-        Text(name, style: AppStyles.largeText), 
-      ]
+      ),
     );
   }
 }

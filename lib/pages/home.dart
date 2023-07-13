@@ -1,22 +1,17 @@
 import 'package:amnesia_music_player/globals.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     AppStyles.initStyles(theme);
 
+    AppState appState = context.watch<AppState>();
+
     final Widget page;
-    switch(selectedIndex) {
+    switch(appState.navigationSelectedIndex) {
       case 0:
         page = const ArtistsPage();
         break;
@@ -61,9 +56,9 @@ class _HomePageState extends State<HomePage> {
                   label: Text('Content Player', style: AppStyles.mediumText),
                 ),
               ],
-              selectedIndex: selectedIndex,
+              selectedIndex: appState.navigationSelectedIndex,
               onDestinationSelected: (value) {
-                updatePage(value);
+                appState.goToPage(value);
               },
             ),
           ),
@@ -76,11 +71,5 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
-  }
-
-  void updatePage(int index) {
-    setState(() {
-      selectedIndex = index;
-    });
   }
 }

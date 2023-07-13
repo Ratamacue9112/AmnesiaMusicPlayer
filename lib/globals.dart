@@ -2,7 +2,9 @@ export 'dart:io';
 
 export 'package:flutter/material.dart';
 export 'package:flutter/widgets.dart';
+export 'package:provider/provider.dart';
 
+export 'main.dart';
 export 'pages/home.dart';
 export 'pages/artists.dart';
 export 'pages/collections.dart';

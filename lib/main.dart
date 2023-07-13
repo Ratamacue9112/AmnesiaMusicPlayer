@@ -1,5 +1,3 @@
-import 'package:provider/provider.dart';
-
 import 'package:amnesia_music_player/globals.dart';
 
 void main() {
@@ -39,4 +37,13 @@ class App extends StatelessWidget {
   }
 }
 
-class AppState extends ChangeNotifier {}
+class AppState extends ChangeNotifier {
+  int navigationSelectedIndex = 0;
+  String selectedArtist = '';
+  String selectedCollection = '';
+
+  void goToPage(int index) {
+    navigationSelectedIndex = index;
+    notifyListeners();
+  }
+}
