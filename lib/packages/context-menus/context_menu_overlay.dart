@@ -12,7 +12,7 @@ import 'widgets/measure_size_widget.dart';
 // This does not rely on Navigator.overlay, so you can place it around your Navigator,
 // supporting context menus within persistent portions of your scaffold.
 class ContextMenuOverlay extends StatefulWidget {
-  ContextMenuOverlay({
+  const ContextMenuOverlay({
     Key? key,
     required this.child,
     this.cardBuilder,
@@ -26,7 +26,7 @@ class ContextMenuOverlay extends StatefulWidget {
   final ContextMenuCardBuilder? cardBuilder;
 
   /// Builds a button for the menu. It will be provided a [ContextMenuButtonConfig] and should return a button
-  late final ContextMenuButtonBuilder? buttonBuilder;
+  final ContextMenuButtonBuilder? buttonBuilder;
 
   /// Builds a vertical or horizontal divider
   final ContextMenuDividerBuilder? dividerBuilder;
@@ -44,7 +44,7 @@ class ContextMenuOverlay extends StatefulWidget {
 }
 
 class ContextMenuOverlayState extends State<ContextMenuOverlay> {
-  static ContextMenuButtonStyle defaultButtonStyle = ContextMenuButtonStyle();
+  static ContextMenuButtonStyle defaultButtonStyle = const ContextMenuButtonStyle();
 
   Widget? _currentMenu;
   Size? _prevSize;
@@ -67,7 +67,7 @@ class ContextMenuOverlayState extends State<ContextMenuOverlay> {
         if (_mousePos.dx > (_prevSize?.width ?? 0) / 2) dx = -_menuSize.width;
         if (_mousePos.dy > (_prevSize?.height ?? 0) / 2) dy = -_menuSize.height;
         // The final menuPos, is mousePos + quadrant offset
-        Offset _menuPos = _mousePos + Offset(dx, dy);
+        Offset menuPos = _mousePos + Offset(dx, dy);
         Widget? menuToShow = _currentMenu;
 
         return _InheritedContextMenuOverlay(
@@ -96,7 +96,7 @@ class ContextMenuOverlayState extends State<ContextMenuOverlay> {
 
                       /// Position the menu contents
                       Transform.translate(
-                        offset: _menuPos,
+                        offset: menuPos,
                         child: Opacity(
                           opacity: _menuSize != Size.zero ? 1 : 0,
                           // Use a measure size widget so we can offset the child properly
@@ -144,7 +144,7 @@ class ContextMenuOverlayState extends State<ContextMenuOverlay> {
 
 /// InheritedWidget boilerplate
 class _InheritedContextMenuOverlay extends InheritedWidget {
-  _InheritedContextMenuOverlay({Key? key, required Widget child, required this.state}) : super(key: key, child: child);
+  const _InheritedContextMenuOverlay({Key? key, required Widget child, required this.state}) : super(key: key, child: child);
 
   final ContextMenuOverlayState state;
 

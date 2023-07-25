@@ -1,14 +1,634 @@
 import 'package:amnesia_music_player/globals.dart';
+import 'package:path/path.dart' as path;
 
-class TracklistPage extends StatelessWidget {
+class TracklistPage extends StatefulWidget {
   const TracklistPage({super.key});
 
   @override
+  State<TracklistPage> createState() => _TracklistPageState();
+}
+
+class _TracklistPageState extends State<TracklistPage> {
+  List<Track> tracklist = [];
+
+  @override
   Widget build(BuildContext context) {
+    AppState appState = context.watch<AppState>();
+    ThemeData theme = Theme.of(context);
+    bool isUncategorized = appState.selectedCollection.name == 'Uncategorized';
+
+    if(appState.selectedCollection.isEmpty()) {
+      return Scaffold(
+        body: Center(
+          child: Text('You have not selected a collection.', style: AppStyles.largeText)
+        ),
+      );
+    }
+
+    if(!isUncategorized) {
+      updateTracklist(appState.selectedCollection);
+    }
+    else {
+      updateUncategorized(appState.selectedCollection);
+    }
+
+    Widget bodyWidget;
+    if(tracklist.isEmpty) {
+      bodyWidget = Column(
+        children: [
+          const SizedBox(height: 150),
+          Center(
+            child: Text('${appState.selectedCollection.name} is empty.', style: AppStyles.largeText)
+          ),
+        ],
+      );
+    }
+    else {
+      bodyWidget = Column(
+        children: [
+          for(int i = 0; i < tracklist.length; i++)
+            TracklistItem(tracklist[i], i + 1, isUncategorized,
+              deleteItem: (item) {
+                if(isUncategorized) {
+                  showDialog(context: context, builder: (context) {
+                    return AlertDialog(
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      content: Text('Are you sure want to delete?\nThis will delete all related content and cannot be undone.', textAlign: TextAlign.center, style: AppStyles.largeText),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Directory(path.join(appState.selectedCollection.directory.parent.parent.path, 'songs', item)).deleteSync(recursive: true);
+                            updateTracklist(appState.selectedCollection);
+                            Navigator.pop(context);
+                          }, 
+                          child: Text('Yes', style: AppStyles.mediumTextSecondary)
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          }, 
+                          child: Text('No', style: AppStyles.mediumTextSecondary)
+                        )
+                      ],
+                    );
+                  });
+                }
+                else {
+                  for(Track track in tracklist) {
+                    if(track.name == item) {
+                      setState(() {
+                        tracklist.remove(track);
+                      });
+                      break;
+                    }
+                  }
+
+                  File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                  tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                  updateTracklist(appState.selectedCollection);
+                }
+              },
+              moveItem: (index, isUp) {
+                if(isUp && index != 0) {
+                  Track movingItem = tracklist[index];
+                  Track originalItem = tracklist[index - 1];
+
+                  setState(() {
+                    tracklist[index] = originalItem;
+                    tracklist[index - 1] = movingItem;
+                  });
+                }
+                else if(!isUp && index != tracklist.length - 1) {
+                  Track movingItem = tracklist[index];
+                  Track originalItem = tracklist[index + 1];
+
+                  setState(() {
+                    tracklist[index] = originalItem;
+                    tracklist[index + 1] = movingItem;
+                  });
+                }
+
+                File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                updateTracklist(appState.selectedCollection);
+              },
+            )
+        ],
+      );
+    }
+
     return Scaffold(
-      body: Center(
-        child: Text('Tracklist Page', style: AppStyles.mediumText)
+      body: ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Image(image: appState.selectedCollection.icon, width: 250, height: 250),
+                Padding(
+                  padding: const EdgeInsets.all(15.0),
+                  child: SizedBox(
+                    height: 250,
+                    child: Column(
+                      children: [
+                        const Spacer(),
+                        RichText(text: TextSpan(
+                          children: [
+                            TextSpan(text: appState.selectedCollection.name, style: AppStyles.titleText.copyWith(fontSize: 45)),
+                            TextSpan(text: '  ${appState.selectedCollection.artistName}', style: AppStyles.titleText.copyWith(fontWeight: FontWeight.w100, fontSize: 30))
+                          ]
+                        )),
+                      ],
+                    )
+                  ),
+                )
+              ],
+            ),
+          ),
+          Expanded(child: bodyWidget),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(context: context, builder: (context) {
+            if(isUncategorized) {
+              return AddTrackNewDialog(updatePage: () {
+                updateUncategorized(appState.selectedCollection);
+              });
+            }
+            return AddTrackChooseDialog(updatePage: () {
+              updateTracklist(appState.selectedCollection);
+            });
+          });
+        },
+        tooltip: 'Add Track',
+        backgroundColor: theme.colorScheme.secondaryContainer,
+        child: const Icon(Icons.add)
+      ),
+    );
+  }
+
+  void updateTracklist(Collection collection) {
+    List<Track> newTracklist = [];
+
+    File tracklistFile = File(path.join(collection.directory.path, 'tracklist.txt'));
+    if(!tracklistFile.parent.existsSync()) {
+      return;
+    }
+    if(!tracklistFile.existsSync()) {
+      tracklistFile.createSync();
+    }
+
+    Directory songsParentDirectory = Directory(path.join(collection.directory.parent.parent.path, 'songs'));
+    if(!songsParentDirectory.existsSync()) {
+      songsParentDirectory.createSync();
+    }
+    List<String> songDirectories = [];
+    for(FileSystemEntity item in songsParentDirectory.listSync()) {
+      if(item is Directory) {
+        songDirectories.add(path.basename(item.path));
+      }
+    }
+
+    for(String line in tracklistFile.readAsLinesSync()) {
+      if(songDirectories.contains(line)) {
+        newTracklist.add(Track(line, collection.artistName, collection, collection.directory));
+      }
+    }
+
+    setState(() {
+      tracklist = newTracklist;
+    });
+  }
+
+  void updateUncategorized(Collection collection) {
+    List<String> usedSongs = [];
+    for(FileSystemEntity item in Directory(path.join(collection.directory.parent.parent.path, 'collections')).listSync()) {
+      if(item is Directory && path.basename(item.path) != 'Uncategorized') {
+        for(String track in File(path.join(item.path, 'tracklist.txt')).readAsLinesSync()) {
+          if(!usedSongs.contains(track)) usedSongs.add(track);
+        }
+      }
+    }
+
+    List<Track> unusedSongs = [];
+    for(FileSystemEntity item in Directory(path.join(collection.directory.parent.parent.path, 'songs')).listSync()) {
+      String songName = path.basename(item.path);
+      if(!usedSongs.contains(songName)) unusedSongs.add(Track(songName, collection.artistName, collection, collection.directory));
+    }
+
+    setState(() {
+      tracklist = unusedSongs;
+    });
+  }
+}
+
+class TracklistItem extends StatefulWidget {
+  final int trackNumber;
+  final Track track;
+  final bool isUncategorized;
+
+  final Function(String item) deleteItem;
+  final Function(int index, bool up) moveItem;
+
+  const TracklistItem(this.track, this.trackNumber, this.isUncategorized, {required this.deleteItem, required this.moveItem, super.key});
+
+  @override
+  State<TracklistItem> createState() => _TracklistItemState();
+}
+
+class _TracklistItemState extends State<TracklistItem> {
+  bool isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+
+    return MouseRegion(
+      onEnter: (event) => setState(() => isHovering = true),
+      onExit: (event) => setState(() => isHovering = false),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: SizedBox(
+          height: 40,
+          child: Container(
+            color: widget.trackNumber % 2 == 0 ? theme.colorScheme.tertiaryContainer : theme.colorScheme.primaryContainer,
+            child: Expanded(
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(text: '${widget.trackNumber}.   ', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w100)),
+                          TextSpan(text: widget.track.name, style: AppStyles.largeText),
+                        ]
+                      )
+                    )
+                  ),
+                  const Spacer(),
+                  // Move up
+                  Visibility(
+                    visible: widget.isUncategorized ? false : isHovering,
+                    child: IconButton(
+                      onPressed: () {
+                        widget.moveItem(widget.trackNumber - 1, true);
+                      },
+                      icon: Icon(Icons.arrow_upward, color: theme.colorScheme.secondaryContainer)
+                    )
+                  ),
+                  // Move down
+                  Visibility(
+                    visible: widget.isUncategorized ? false : isHovering,
+                    child: IconButton(
+                      onPressed: () {
+                        widget.moveItem(widget.trackNumber - 1, false);
+                      },
+                      icon: Icon(Icons.arrow_downward, color: theme.colorScheme.secondaryContainer)
+                    )
+                  ),
+                  // Delete
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: Visibility(
+                      visible: isHovering,
+                      child: IconButton(
+                        onPressed: () {
+                          widget.deleteItem(widget.track.name);
+                        },
+                        icon: Icon(widget.isUncategorized ? Icons.delete : Icons.highlight_remove, color: theme.colorScheme.secondaryContainer)
+                      )
+                    ),
+                  )
+                ],
+              )
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AddTrackChooseDialog extends StatelessWidget {
+  const AddTrackChooseDialog({super.key, required this.updatePage});
+
+  final Function updatePage;
+
+  @override
+  Widget build(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+
+    return Dialog(
+      backgroundColor: theme.colorScheme.primaryContainer,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Title
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text('Add a Track', style: AppStyles.titleText),
+          ),
+          // Add existing or create new
+          const Spacer(),
+          Row(
+            children: [
+              const Spacer(),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                onPressed: () {
+                  Navigator.pop(context);
+                  showDialog(context: context, builder: (context) {
+                    return AddTrackExistingDialog(updatePage: updatePage);
+                  });
+                },
+                child: Text('Add Existing Song', style: AppStyles.titleTextSecondary)
+              ),
+              const Spacer(),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('or', style: AppStyles.largeText),
+          ),
+          Row(
+            children: [
+              const Spacer(),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                onPressed: () {
+                  Navigator.pop(context);
+                  showDialog(context: context, builder: (context) {
+                    return AddTrackNewDialog(updatePage: updatePage);
+                  });
+                },
+                child: Text('Create New Song', style: AppStyles.titleTextSecondary)
+              ),
+              const Spacer()
+            ],
+          ),
+          // Cancel
+          const Spacer(),
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    }, 
+                    child: Text('Cancel', style: AppStyles.mediumTextSecondary)
+                  ),
+                )
+              )
+            ],
+          )
+        ]
+      ),
+    );
+  }
+}
+
+class AddTrackExistingDialog extends StatefulWidget {
+  const AddTrackExistingDialog({super.key, required this.updatePage});
+
+  final Function updatePage;
+
+  @override
+  State<AddTrackExistingDialog> createState() => _AddTrackExistingDialogState();
+}
+
+class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
+  TextEditingController searchController = TextEditingController(text: '');
+
+  List<String> alreadyAddedSongs = [];
+  List<String> allSongs = [];
+  List<String> filteredSongs = [];
+
+  @override
+  Widget build(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+    AppState appState = context.watch<AppState>();
+
+    updateSongs(appState.selectedCollection.directory);
+    if(searchController.text == '') {
+      filteredSongs = allSongs;
+    }
+
+    return Dialog(
+      backgroundColor: theme.colorScheme.primaryContainer,
+      child: Column(
+        children: [
+          // Title
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Text('Add Existing Song', style: AppStyles.titleText),
+          ),
+          // Search box
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: TextField(
+              controller: searchController,
+              onChanged: (value) {
+                setState(() {
+                  filteredSongs = allSongs.where((item) => item.toLowerCase().contains(value.toLowerCase())).toList();
+                });
+              },
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: theme.colorScheme.secondaryContainer,
+                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search for songs',
+              ),
+            ),
+          ),
+          // List
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredSongs.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                  child: ListTile(
+                    title: Text(filteredSongs[index]),
+                    tileColor: theme.colorScheme.secondaryContainer,
+                    onTap: () {
+                      List<String> newTracklist = alreadyAddedSongs;
+                      newTracklist.add(filteredSongs[index]);
+
+                      File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                      tracklistFile.writeAsStringSync(Utilities.listToString(newTracklist));
+
+                      widget.updatePage();
+
+                      Navigator.pop(context);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          // Cancel
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: Text('Cancel', style: AppStyles.mediumTextSecondary),
+                  ),
+                )
+              )
+            ],
+          )
+        ],
       )
     );
+  }
+
+  void updateSongs(Directory collectionDirectory) {
+    List<String> updatedSongs = [];
+
+    for(FileSystemEntity item in Directory(path.join(collectionDirectory.parent.parent.path, 'songs')).listSync()) {
+      if(item is Directory) {
+        String songName = path.basename(item.path);
+        if(!alreadyAddedSongs.contains(songName)) {
+          updatedSongs.add(songName);
+        }
+      }
+    }
+
+    setState(() {
+      alreadyAddedSongs = File(path.join(collectionDirectory.path, 'tracklist.txt')).readAsLinesSync();
+      allSongs = updatedSongs.where((element) => !alreadyAddedSongs.contains(element)).toList();
+    });
+  }
+}
+
+class AddTrackNewDialog extends StatefulWidget {
+  const AddTrackNewDialog({required this.updatePage, super.key});
+
+  final Function updatePage;
+
+  @override
+  State<AddTrackNewDialog> createState() => _AddTrackNewDialogState();
+}
+
+class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
+  TextEditingController nameController = TextEditingController();
+  String currentTrackName = '';
+  String currentCreateTrackError = '';
+
+  @override
+  Widget build(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+    AppState appState = context.watch<AppState>();
+
+    return StatefulBuilder(builder: (stfContext, stfSetState) {
+      return Dialog(
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Column(
+          children: [
+            // Title
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Text('Create New Song', style: AppStyles.titleText),
+            ),
+            // Name field
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: theme.colorScheme.secondaryContainer,
+                  hintText: 'Enter song name here',
+                ),
+                controller: nameController,
+                
+                onChanged: (value) => {
+                  stfSetState(() {
+                    currentTrackName = value;
+                  })
+                },
+              ),
+            ),
+            // Cancel and confirm buttons
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                children: [
+                  Text(currentCreateTrackError, style: AppStyles.titleText.copyWith(color: const Color.fromARGB(255, 202, 13, 0), fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          }, 
+                          child: Text('Cancel', style: AppStyles.mediumTextSecondary)
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        flex: 5,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                          onPressed: () {
+                            if(currentTrackName == '') {
+                              setState(() {
+                                currentCreateTrackError = 'The song needs a name!';
+                              });
+                              return;
+                            }
+
+                            List<String> songs = [];
+                            Directory songsDirectory = Directory(path.join(appState.selectedCollection.directory.parent.parent.path, 'songs'));
+                            for(FileSystemEntity item in songsDirectory.listSync()) {
+                              if(item is Directory) songs.add(path.basename(item.path));
+                            }
+
+                            if(songs.contains(currentTrackName)) {
+                              setState(() {
+                                currentCreateTrackError = 'A song with this name already exists!';
+                              });
+                              return;
+                            }
+
+                            Directory(path.join(songsDirectory.path, currentTrackName)).createSync();
+
+                            File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                            List<String> tracklist = tracklistFile.readAsLinesSync();
+                            tracklist.add(currentTrackName);
+                            tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+
+                            widget.updatePage();
+                            Navigator.pop(context);
+                          },
+                          child: Text('Confirm', style: AppStyles.mediumTextSecondary)
+                        )
+                      )
+                    ]
+                  )
+                ]
+              )
+            )
+          ],
+        ),
+      );
+    });
   }
 }

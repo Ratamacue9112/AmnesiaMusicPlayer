@@ -22,6 +22,9 @@ class HomePage extends StatelessWidget {
         page = const TracklistPage();
         break;
       case 3:
+        page = const SongContentPage();
+        break;
+      case 4:
         page = const ContentPlayerPage();
         break;
       default:
@@ -50,6 +53,10 @@ class HomePage extends StatelessWidget {
                 NavigationRailDestination(
                   icon: const Icon(Icons.queue_music),
                   label: Text('Tracklist', style: AppStyles.mediumText),
+                ),
+                NavigationRailDestination(
+                  icon: const Icon(Icons.music_note), 
+                  label: Text('Song Content', style:  AppStyles.mediumText)
                 ),
                 NavigationRailDestination(
                   icon: const Icon(Icons.play_arrow_rounded),

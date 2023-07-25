@@ -65,6 +65,7 @@ flutter:
   assets:
     - assets/images/default_artist_icon.png
     - assets/images/default_collection_icon.png
+    - assets/images/uncategorized_collection_icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

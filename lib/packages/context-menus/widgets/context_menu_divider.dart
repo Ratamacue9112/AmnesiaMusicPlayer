@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 /// Hz Divider
-typedef Widget ContextMenuDividerBuilder(BuildContext context);
+typedef ContextMenuDividerBuilder = Widget Function(BuildContext context);
 
 class ContextMenuDivider extends StatelessWidget {
+  const ContextMenuDivider({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Padding(

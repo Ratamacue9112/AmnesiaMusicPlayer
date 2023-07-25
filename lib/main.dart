@@ -25,6 +25,7 @@ class App extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color.fromARGB(255, 65, 65, 65),
             primaryContainer: const Color.fromARGB(255, 97, 97, 97),
+            tertiaryContainer: const Color.fromARGB(255, 105, 105, 105),
             secondaryContainer: const Color.fromARGB(255, 156, 156, 156),
             onPrimary: Colors.white,
             onSecondary: Colors.black
@@ -40,7 +41,7 @@ class App extends StatelessWidget {
 class AppState extends ChangeNotifier {
   int navigationSelectedIndex = 0;
   String selectedArtist = '';
-  String selectedCollection = '';
+  Collection selectedCollection = Collection.empty;
 
   void goToPage(int index) {
     navigationSelectedIndex = index;

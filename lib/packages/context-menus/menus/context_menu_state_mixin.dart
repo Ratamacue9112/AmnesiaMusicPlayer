@@ -29,5 +29,5 @@ mixin ContextMenuStateMixin<T extends StatefulWidget> on State<T> {
   }
 
   /// Builds divider to separate sections in the menu
-  Widget buildDivider() => overlay.dividerBuilder?.call(context) ?? ContextMenuDivider();
+  Widget buildDivider() => overlay.dividerBuilder?.call(context) ?? const ContextMenuDivider();
 }

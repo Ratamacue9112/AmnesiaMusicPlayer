@@ -1,5 +1,3 @@
-import 'package:amnesia_music_player/packages/file_picker.dart';
-import 'package:amnesia_music_player/packages/context_menus.dart';
 import 'package:path/path.dart' as path;
 
 import 'package:amnesia_music_player/globals.dart';
@@ -17,41 +15,54 @@ class _ArtistsPageState extends State<ArtistsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-  
+
     updateArtists();
 
-    return ContextMenuOverlay(
-      buttonStyle: AppStyles.contextMenuStyle,
-      child: Scaffold(
-        body: GridView.extent(
-          maxCrossAxisExtent: 300.0,
-          mainAxisSpacing: 8.0,
-          crossAxisSpacing: 8.0,
-          padding: const EdgeInsets.all(12.0),
-          children: [
-            for(MapEntry<String, ImageProvider> item in artists.entries)
-              ContextMenuRegion(
-                enableLongPress: false,
-                contextMenu: ArtistProfileContextMenu(item.key, updatePage: () {
-                  updateArtists();
-                }),
-                child: ArtistProfile(item.key, item.value)
-              ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            showDialog(context: context, builder: (context) {
-              return CreateArtistDialog(updatePage: () {
-                updateArtists();
-              });
-            });
-          },
-          tooltip: 'Add Artist',
-          backgroundColor: theme.colorScheme.secondaryContainer,
-          child: const Icon(Icons.add))
-        ),
+    Widget floatingActionButton = FloatingActionButton(
+      onPressed: () {
+        showDialog(context: context, builder: (context) {
+          return CreateArtistDialog(updatePage: () {
+            updateArtists();
+          });
+        });
+      },
+      tooltip: 'Add Artist',
+      backgroundColor: theme.colorScheme.secondaryContainer,
+      child: const Icon(Icons.add)
     );
+
+    if(artists.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: Text('You have created no artists.', style: AppStyles.largeText),
+        ),
+        floatingActionButton: floatingActionButton,
+      );
+    }
+    else {
+      return ContextMenuOverlay(
+        buttonStyle: AppStyles.contextMenuStyle,
+        child: Scaffold(
+          body: GridView.extent(
+            maxCrossAxisExtent: 300.0,
+            mainAxisSpacing: 8.0,
+            crossAxisSpacing: 8.0,
+            padding: const EdgeInsets.all(12.0),
+            children: [
+              for(MapEntry<String, ImageProvider> item in artists.entries)
+                ContextMenuRegion(
+                  enableLongPress: false,
+                  contextMenu: ArtistProfileContextMenu(item.key, appState: context.watch<AppState>(), updatePage: () {
+                    updateArtists();
+                  }),
+                  child: ArtistProfile(item.key, item.value)
+                ),
+            ],
+          ),
+          floatingActionButton: floatingActionButton
+        ),
+      );
+    }
   }
 
   void updateArtists() {
@@ -59,20 +70,17 @@ class _ArtistsPageState extends State<ArtistsPage> {
 
     for(FileSystemEntity item in Directory(Globals.appDataPath).listSync()) {
       if(item is Directory) {
-        String basename = path.basename(item.path);
-        if(basename.startsWith('--') && basename.endsWith('--')) {
-          String artistName = basename.substring(2, basename.length - 2);
-          File imageFile = File(path.join(item.path, 'icon.png'));
-          ImageProvider image;
-          if(imageFile.existsSync()) {
-            image = FileImage(imageFile);
-          }
-          else {
-            image = const AssetImage('assets/images/default_artist_icon.png');
-          }
-
-          newArtists[artistName] = image;
+        String artistName = path.basename(item.path);
+        File imageFile = File(path.join(item.path, 'icon.png'));
+        ImageProvider image;
+        if(imageFile.existsSync()) {
+          image = FileImage(imageFile);
         }
+        else {
+          image = const AssetImage('assets/images/default_artist_icon.png');
+        }
+
+        newArtists[artistName] = image;
       }
     }
 
@@ -85,17 +93,20 @@ class _ArtistsPageState extends State<ArtistsPage> {
 class ArtistProfile extends StatelessWidget {
   final ImageProvider image;
   final String name;
+  final bool interactable;
 
-  const ArtistProfile(this.name, this.image, {super.key});
+  const ArtistProfile(this.name, this.image, {this.interactable = true, super.key});
 
   @override
   Widget build(BuildContext context) {
     AppState appState = context.watch<AppState>();
 
-    return InkWell(
+    return GestureDetector(
       onTap: () {
-        appState.selectedArtist = name;
-        appState.goToPage(1);
+        if(interactable) {
+          appState.selectedArtist = name;
+          appState.goToPage(1);
+        }
       },
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -125,9 +136,10 @@ class ArtistProfile extends StatelessWidget {
 
 class ArtistProfileContextMenu extends StatelessWidget {
   final String artistName;
+  final AppState appState;
   final Function() updatePage;
 
-  const ArtistProfileContextMenu(this.artistName, {required this.updatePage, super.key});
+  const ArtistProfileContextMenu(this.artistName, {required this.updatePage, required this.appState, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +156,7 @@ class ArtistProfileContextMenu extends StatelessWidget {
         ),
         ContextMenuButtonConfig('Delete', 
           onPressed: () async {
-            Directory dir = Directory(path.join(Globals.appDataPath, '--$artistName--'));
+            Directory dir = Directory(path.join(Globals.appDataPath, artistName));
             if(dir.existsSync()) {
               await showDialog(context: context, builder: (context) {
                 return AlertDialog(
@@ -154,6 +166,9 @@ class ArtistProfileContextMenu extends StatelessWidget {
                     TextButton(
                       onPressed: () {
                         dir.deleteSync(recursive: true);
+                        if(artistName == appState.selectedArtist) {
+                          appState.selectedArtist = '';
+                        }
                         Navigator.pop(context);
                       }, 
                       child: Text('Yes', style: AppStyles.mediumTextSecondary)
@@ -202,7 +217,7 @@ class _CreateArtistDialogState extends State<CreateArtistDialog> {
       nameController = TextEditingController(text: widget.artistName);
       setState(() {
         currentArtistName = widget.artistName;
-        File icon = File(path.join(Globals.appDataPath, '--${widget.artistName}--', 'icon.png'));
+        File icon = File(path.join(Globals.appDataPath, widget.artistName, 'icon.png'));
         if(icon.existsSync()) { 
           artistImage = FileImage(icon);
         }
@@ -282,9 +297,9 @@ class _CreateArtistDialogState extends State<CreateArtistDialog> {
             const Spacer(),
             Center(
               child: SizedBox(
-                width: 200,
-                height: 200,
-                child: ArtistProfile(currentArtistName == '' ? 'Artist name here' : currentArtistName, artistImage)
+                width: 300,
+                height: 300,
+                child: ArtistProfile(currentArtistName == '' ? 'Artist name here' : currentArtistName, artistImage, interactable: false)
               ),
             ),
             //Cancel or confirm
@@ -320,10 +335,10 @@ class _CreateArtistDialogState extends State<CreateArtistDialog> {
                               return;
                             }
 
-                            Directory dir = Directory(path.join(Globals.appDataPath, '--$currentArtistName--'));
+                            Directory dir = Directory(path.join(Globals.appDataPath, currentArtistName));
                             Directory oldDir = Directory('');
                             if(isEditing) {
-                              oldDir = Directory(path.join(Globals.appDataPath, '--${widget.artistName}--'));
+                              oldDir = Directory(path.join(Globals.appDataPath, widget.artistName));
                             }
 
                             if(dir.existsSync() && (!isEditing || (isEditing && currentArtistName != widget.artistName))) {
