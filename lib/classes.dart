@@ -1,4 +1,5 @@
 import 'globals.dart';
+import 'package:path/path.dart' as path;
 
 class Collection {
   final String name;
@@ -16,10 +17,78 @@ class Collection {
 }
 
 class Track {
-  final String name;
+  String name;
   final String artistName;
   final Collection collection;
-  final Directory directory;
+  Directory directory;
+  bool hasDemo = false;
+  bool hasFinal = false;
 
-  const Track(this.name, this.artistName, this.collection, this.directory);
+  Settings? settings;
+
+  static final Track empty = Track('', '', Collection.empty, Collection.empty.directory);
+
+  Track(this.name, this.artistName, this.collection, this.directory) {
+    settings = Settings(directory);
+  }
+}
+
+class Content {
+  final String name;
+  final Track track;
+  final File file;
+  final FileType type;
+  bool isDemo = false;
+  bool isFinal = false;
+
+  Content(this.name, this.track, this.file, this.type);
+
+  static Content empty = Content('', Track.empty, File(''), FileType.any);
+}
+
+class Settings {
+  Map<String, String> settings = {};
+
+  Directory songDirectory;
+
+  Settings(this.songDirectory);
+
+  T get<T>(String setting, T defaultValue) {
+    if(!settings.containsKey(setting)) return defaultValue; 
+
+    if(T == bool) {
+      return (settings[setting] == 'true') as T;
+    }
+
+    return defaultValue;
+  }
+
+  void set<T>(String setting, T value) {
+    settings[setting] = value.toString();
+  }
+
+  void read() {
+    File settingsFile = File(path.join(songDirectory.path, 'settings.txt'));
+    if(!settingsFile.existsSync()) settingsFile.createSync();
+
+    settings = {};
+
+    for(String line in settingsFile.readAsLinesSync()) {
+      List<String> setting = line.split('=');
+      settings[setting.first] = setting.last;
+    }
+  }
+
+  void save() {
+    String settingsString = '';
+
+    for(String setting in settings.keys) {
+      settingsString += '$setting=${settings[setting]}\n';
+    }
+
+    File settingsFile = File(path.join(songDirectory.path, 'settings.txt'));
+    if(!settingsFile.existsSync()) settingsFile.createSync();
+
+    settingsFile.writeAsStringSync(settingsString);
+  }
 }

@@ -126,7 +126,7 @@ class ArtistProfile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 5),
-            Text(name, style: AppStyles.largeText), 
+            Text(name, textAlign: TextAlign.center, style: AppStyles.largeText), 
           ]
         ),
       ),

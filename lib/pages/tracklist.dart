@@ -58,6 +58,9 @@ class _TracklistPageState extends State<TracklistPage> {
                         TextButton(
                           onPressed: () {
                             Directory(path.join(appState.selectedCollection.directory.parent.parent.path, 'songs', item)).deleteSync(recursive: true);
+                            if(appState.selectedTrack.name == item) {
+                              appState.selectedTrack = Track.empty;
+                            }
                             updateTracklist(appState.selectedCollection);
                             Navigator.pop(context);
                           }, 
@@ -81,6 +84,10 @@ class _TracklistPageState extends State<TracklistPage> {
                       });
                       break;
                     }
+                  }
+
+                  if(appState.selectedTrack.name == item) {
+                    appState.selectedTrack = Track.empty;
                   }
 
                   File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
@@ -112,7 +119,8 @@ class _TracklistPageState extends State<TracklistPage> {
                 tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
                 updateTracklist(appState.selectedCollection);
               },
-            )
+            ),
+          const SizedBox(height: 75)
         ],
       );
     }
@@ -154,6 +162,7 @@ class _TracklistPageState extends State<TracklistPage> {
             if(isUncategorized) {
               return AddTrackNewDialog(updatePage: () {
                 updateUncategorized(appState.selectedCollection);
+                
               });
             }
             return AddTrackChooseDialog(updatePage: () {
@@ -190,10 +199,20 @@ class _TracklistPageState extends State<TracklistPage> {
       }
     }
 
+    bool rewriteTracklist = false;
     for(String line in tracklistFile.readAsLinesSync()) {
       if(songDirectories.contains(line)) {
-        newTracklist.add(Track(line, collection.artistName, collection, collection.directory));
+        Track track = Track(line, collection.artistName, collection, Directory(path.join(songsParentDirectory.path, line)));
+        track.settings!.read();
+        newTracklist.add(track);
       }
+      else {
+        rewriteTracklist = true;
+      }
+    }
+
+    if(rewriteTracklist) {
+      tracklistFile.writeAsStringSync(Utilities.listToString(newTracklist));
     }
 
     setState(() {
@@ -214,7 +233,9 @@ class _TracklistPageState extends State<TracklistPage> {
     List<Track> unusedSongs = [];
     for(FileSystemEntity item in Directory(path.join(collection.directory.parent.parent.path, 'songs')).listSync()) {
       String songName = path.basename(item.path);
-      if(!usedSongs.contains(songName)) unusedSongs.add(Track(songName, collection.artistName, collection, collection.directory));
+      Track track = Track(songName, collection.artistName, collection, Directory(item.path));
+      track.settings!.read();
+      if(!usedSongs.contains(songName)) unusedSongs.add(track);
     }
 
     setState(() {
@@ -243,66 +264,91 @@ class _TracklistItemState extends State<TracklistItem> {
   @override
   Widget build(BuildContext context) {
     ThemeData theme = Theme.of(context);
+    AppState appState = context.watch<AppState>();
 
-    return MouseRegion(
-      onEnter: (event) => setState(() => isHovering = true),
-      onExit: (event) => setState(() => isHovering = false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: SizedBox(
-          height: 40,
-          child: Container(
-            color: widget.trackNumber % 2 == 0 ? theme.colorScheme.tertiaryContainer : theme.colorScheme.primaryContainer,
-            child: Expanded(
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(text: '${widget.trackNumber}.   ', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w100)),
-                          TextSpan(text: widget.track.name, style: AppStyles.largeText),
-                        ]
-                      )
-                    )
-                  ),
-                  const Spacer(),
-                  // Move up
-                  Visibility(
-                    visible: widget.isUncategorized ? false : isHovering,
-                    child: IconButton(
-                      onPressed: () {
-                        widget.moveItem(widget.trackNumber - 1, true);
-                      },
-                      icon: Icon(Icons.arrow_upward, color: theme.colorScheme.secondaryContainer)
-                    )
-                  ),
-                  // Move down
-                  Visibility(
-                    visible: widget.isUncategorized ? false : isHovering,
-                    child: IconButton(
-                      onPressed: () {
-                        widget.moveItem(widget.trackNumber - 1, false);
-                      },
-                      icon: Icon(Icons.arrow_downward, color: theme.colorScheme.secondaryContainer)
-                    )
-                  ),
-                  // Delete
-                  Padding(
-                    padding: const EdgeInsets.only(right: 5.0),
-                    child: Visibility(
-                      visible: isHovering,
-                      child: IconButton(
-                        onPressed: () {
-                          widget.deleteItem(widget.track.name);
-                        },
-                        icon: Icon(widget.isUncategorized ? Icons.delete : Icons.highlight_remove, color: theme.colorScheme.secondaryContainer)
+    return SizedBox(
+      height: 40,
+      child: GestureDetector(
+        onTap: () {
+          appState.selectedTrack = widget.track;
+          appState.goToPage(3);
+        },
+        child: MouseRegion(
+          onEnter: (event) => setState(() => isHovering = true),
+          onExit: (event) => setState(() => isHovering = false),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Container(
+              color: widget.trackNumber % 2 == 0 ? theme.colorScheme.tertiaryContainer : theme.colorScheme.primaryContainer,
+              child: Expanded(
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(text: '${widget.trackNumber}.   ', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w100)),
+                            TextSpan(
+                              text: widget.track.settings!.get<bool>('workingTitle', false) ? '[${widget.track.name}]' : widget.track.name, 
+                              style: AppStyles.largeText.copyWith(fontWeight: widget.track.hasDemo || widget.track.hasFinal ? FontWeight.normal : FontWeight.w300)
+                            ),
+                          ]
+                        )
                       )
                     ),
-                  )
-                ],
-              )
+                    const Spacer(),
+                    // Open content
+                    Visibility(
+                      visible: widget.isUncategorized ? false : isHovering,
+                      child: IconButton(
+                        onPressed: () {
+                          appState.selectedTrack = widget.track;
+                          appState.goToPage(3);
+                        },
+                        icon: Icon(Icons.more_horiz, color: theme.colorScheme.secondaryContainer),
+                        tooltip: 'Open content',
+                      )
+                    ),
+                    // Move up
+                    Visibility(
+                      visible: widget.isUncategorized ? false : isHovering,
+                      child: IconButton(
+                        onPressed: () {
+                          widget.moveItem(widget.trackNumber - 1, true);
+                        },
+                        icon: Icon(Icons.arrow_upward, color: theme.colorScheme.secondaryContainer),
+                        tooltip: 'Move up',
+                      )
+                    ),
+                    // Move down
+                    Visibility(
+                      visible: widget.isUncategorized ? false : isHovering,
+                      child: IconButton(
+                        onPressed: () {
+                          widget.moveItem(widget.trackNumber - 1, false);
+                        },
+                        icon: Icon(Icons.arrow_downward, color: theme.colorScheme.secondaryContainer), 
+                        tooltip: 'Move down',
+                      )
+                    ),
+                    // Delete
+                    Padding(
+                      padding: const EdgeInsets.only(right: 5.0),
+                      child: Visibility(
+                        visible: isHovering,
+                        child: IconButton(
+                          onPressed: () {
+                            widget.deleteItem(widget.track.name);
+                          },
+                          icon: Icon(widget.isUncategorized ? Icons.delete : Icons.highlight_remove, color: theme.colorScheme.secondaryContainer),
+                          tooltip: 'Remove',
+                        )
+                      ),
+                    )
+                  ],
+                )
+              ),
             ),
           ),
         ),
@@ -343,7 +389,7 @@ class AddTrackChooseDialog extends StatelessWidget {
                     return AddTrackExistingDialog(updatePage: updatePage);
                   });
                 },
-                child: Text('Add Existing Song', style: AppStyles.titleTextSecondary)
+                child: Text('Add Existing Song', style: AppStyles.largeTextSecondary)
               ),
               const Spacer(),
             ],
@@ -363,7 +409,7 @@ class AddTrackChooseDialog extends StatelessWidget {
                     return AddTrackNewDialog(updatePage: updatePage);
                   });
                 },
-                child: Text('Create New Song', style: AppStyles.titleTextSecondary)
+                child: Text('Create New Song', style: AppStyles.largeTextSecondary)
               ),
               const Spacer()
             ],
@@ -405,8 +451,8 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
   TextEditingController searchController = TextEditingController(text: '');
 
   List<String> alreadyAddedSongs = [];
-  List<String> allSongs = [];
-  List<String> filteredSongs = [];
+  Map<String, Settings> allSongs = {};
+  Map<String, Settings> filteredSongs = {};
 
   @override
   Widget build(BuildContext context) {
@@ -434,7 +480,10 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
               controller: searchController,
               onChanged: (value) {
                 setState(() {
-                  filteredSongs = allSongs.where((item) => item.toLowerCase().contains(value.toLowerCase())).toList();
+                  filteredSongs = {
+                    for (final key in allSongs.keys)
+                      if (key.toLowerCase().contains(value.toLowerCase())) key: allSongs[key]!
+                  };
                 });
               },
               decoration: InputDecoration(
@@ -454,11 +503,11 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   child: ListTile(
-                    title: Text(filteredSongs[index]),
+                    title: Text(filteredSongs.values.elementAt(index).get<bool>('workingTitle', false) ? '[${filteredSongs.keys.elementAt(index)}]' : filteredSongs.keys.elementAt(index)),
                     tileColor: theme.colorScheme.secondaryContainer,
                     onTap: () {
                       List<String> newTracklist = alreadyAddedSongs;
-                      newTracklist.add(filteredSongs[index]);
+                      newTracklist.add(filteredSongs.keys.toList()[index]);
 
                       File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
                       tracklistFile.writeAsStringSync(Utilities.listToString(newTracklist));
@@ -495,28 +544,35 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
   }
 
   void updateSongs(Directory collectionDirectory) {
-    List<String> updatedSongs = [];
+    Map<String, Settings> updatedSongs = {};
+
+    setState(() {
+      alreadyAddedSongs = File(path.join(collectionDirectory.path, 'tracklist.txt')).readAsLinesSync();
+    });
 
     for(FileSystemEntity item in Directory(path.join(collectionDirectory.parent.parent.path, 'songs')).listSync()) {
       if(item is Directory) {
         String songName = path.basename(item.path);
         if(!alreadyAddedSongs.contains(songName)) {
-          updatedSongs.add(songName);
+          Settings settings = Settings(Directory(item.path));
+          settings.read();
+          updatedSongs[songName] = settings;
         }
       }
     }
 
     setState(() {
-      alreadyAddedSongs = File(path.join(collectionDirectory.path, 'tracklist.txt')).readAsLinesSync();
-      allSongs = updatedSongs.where((element) => !alreadyAddedSongs.contains(element)).toList();
+      allSongs = updatedSongs;
     });
   }
 }
 
 class AddTrackNewDialog extends StatefulWidget {
-  const AddTrackNewDialog({required this.updatePage, super.key});
+  const AddTrackNewDialog({required this.updatePage, this.isEditing = false, this.track, super.key});
 
   final Function updatePage;
+  final bool isEditing;
+  final Track? track;
 
   @override
   State<AddTrackNewDialog> createState() => _AddTrackNewDialogState();
@@ -526,6 +582,19 @@ class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
   TextEditingController nameController = TextEditingController();
   String currentTrackName = '';
   String currentCreateTrackError = '';
+  bool currentTrackIsWorkingTitle = false;
+
+  @override
+  void initState() {
+    if(widget.isEditing) {
+      setState(() {
+        nameController.value = TextEditingValue(text: widget.track!.name);
+        currentTrackName = widget.track!.name;
+        currentTrackIsWorkingTitle = widget.track!.settings!.get('workingTitle', false);
+      });
+    }
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -540,7 +609,7 @@ class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
             // Title
             Padding(
               padding: const EdgeInsets.all(14.0),
-              child: Text('Create New Song', style: AppStyles.titleText),
+              child: Text(widget.isEditing ? 'Edit ${appState.selectedTrack.name}' : 'Create New Song', style: AppStyles.titleText),
             ),
             // Name field
             const Spacer(),
@@ -561,6 +630,26 @@ class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
                   })
                 },
               ),
+            ),
+            // Is working title
+            Row(
+              children: [
+                const Spacer(),
+                SizedBox(
+                  width: 250,
+                  child: CheckboxListTile(
+                    value: currentTrackIsWorkingTitle, 
+                    title: DefaultTextStyle(
+                      style: AppStyles.largeText,
+                      child: const Text('Working Title')
+                    ),       
+                    onChanged: (value) {
+                      setState(() => currentTrackIsWorkingTitle = value!);
+                    }
+                  ),
+                ),
+                const Spacer()
+              ],
             ),
             // Cancel and confirm buttons
             const Spacer(),
@@ -601,24 +690,46 @@ class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
                               if(item is Directory) songs.add(path.basename(item.path));
                             }
 
-                            if(songs.contains(currentTrackName)) {
+                            if(songs.contains(currentTrackName) && (widget.track!.name != currentTrackName)) {
                               setState(() {
                                 currentCreateTrackError = 'A song with this name already exists!';
                               });
                               return;
                             }
 
-                            Directory(path.join(songsDirectory.path, currentTrackName)).createSync();
+                            Directory newSongDirectory = Directory(path.join(songsDirectory.path, currentTrackName));
+                            if(widget.isEditing) {
+                              File tracklistFile = File(path.join(widget.track!.collection.directory.path, 'tracklist.txt'));
+                              List<String> tracklist = tracklistFile.readAsLinesSync();
+                              tracklist.remove(path.basename(widget.track!.directory.path));
+                              tracklist.add(currentTrackName);
+                              tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
 
-                            File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
-                            List<String> tracklist = tracklistFile.readAsLinesSync();
-                            tracklist.add(currentTrackName);
-                            tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                              Track newTrack = widget.track!;
+                              newTrack.name = currentTrackName;
+                              newTrack.directory.renameSync(newSongDirectory.path);
+                              newTrack.directory = newSongDirectory;
+                              newTrack.settings!.set('workingTitle', currentTrackIsWorkingTitle);
+                              newTrack.settings!.songDirectory = newSongDirectory;
+                              newTrack.settings!.save();
+                              appState.selectedTrack = newTrack;
+                            }
+                            else {
+                              newSongDirectory.createSync();
+                              Settings settings = Settings(newSongDirectory);
+                              settings.set('workingTitle', currentTrackIsWorkingTitle);
+                              settings.save();
+
+                              File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                              List<String> tracklist = tracklistFile.readAsLinesSync();
+                              tracklist.add(currentTrackName);
+                              tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                            }
 
                             widget.updatePage();
                             Navigator.pop(context);
                           },
-                          child: Text('Confirm', style: AppStyles.mediumTextSecondary)
+                          child: Text(widget.isEditing ? 'Edit' : 'Confirm', style: AppStyles.mediumTextSecondary)
                         )
                       )
                     ]

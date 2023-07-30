@@ -1,6 +1,7 @@
 import 'package:amnesia_music_player/globals.dart';
 
 void main() {
+  DartVLC.initialize();
   runApp(const App());
 
   final appDataDirectory = Directory(Globals.appDataPath);
@@ -42,6 +43,8 @@ class AppState extends ChangeNotifier {
   int navigationSelectedIndex = 0;
   String selectedArtist = '';
   Collection selectedCollection = Collection.empty;
+  Track selectedTrack = Track.empty;
+  Content selectedContent = Content.empty;
 
   void goToPage(int index) {
     navigationSelectedIndex = index;

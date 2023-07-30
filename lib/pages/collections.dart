@@ -286,7 +286,7 @@ class _CreateCollectionDialogState extends State<CreateCollectionDialog> {
       nameController = TextEditingController(text: widget.collectionName);
       setState(() {
         currentCollectionName = widget.collectionName;
-        File icon = File(path.join(Globals.appDataPath, appState.selectedArtist, 'collection', widget.collectionName, 'icon.png'));
+        File icon = File(path.join(Globals.appDataPath, appState.selectedArtist, 'collections', widget.collectionName, 'icon.png'));
         if(icon.existsSync()) { 
           collectionImage = FileImage(icon);
         }

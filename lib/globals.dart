@@ -6,6 +6,7 @@ export 'package:provider/provider.dart';
 
 export 'main.dart';
 export 'classes.dart';
+
 export 'pages/home.dart';
 export 'pages/artists.dart';
 export 'pages/collections.dart';
@@ -13,21 +14,25 @@ export 'pages/tracklist.dart';
 export 'pages/song_content.dart';
 export 'pages/content_player.dart';
 
-export 'package:amnesia_music_player/packages/file_picker.dart';
-export 'package:amnesia_music_player/packages/context_menus.dart';
+export 'widgets/audio_player_widget.dart';
+
+export 'package:file_picker/file_picker.dart';
+export 'package:context_menus/context_menus.dart';
+export 'package:dart_vlc/dart_vlc.dart';
+export 'package:audioplayers/audioplayers.dart';
 
 import 'dart:io';
 import 'package:amnesia_music_player/classes.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
-import 'packages/context_menus.dart';
+import 'package:context_menus/context_menus.dart';
 
 class AppStyles {
   static TextStyle mediumText = const TextStyle();
   static TextStyle mediumTextSecondary = const TextStyle();
   static TextStyle largeText = const TextStyle();
+  static TextStyle largeTextSecondary = const TextStyle();
   static TextStyle titleText = const TextStyle();
-  static TextStyle titleTextSecondary = const TextStyle();
   
   static ContextMenuButtonStyle contextMenuStyle = const ContextMenuButtonStyle();
 
@@ -41,11 +46,11 @@ class AppStyles {
     largeText = theme.textTheme.bodyLarge!.copyWith(
       color: theme.colorScheme.onPrimary
     );
+    largeTextSecondary = theme.textTheme.bodyLarge!.copyWith(
+      color: theme.colorScheme.onSecondary,
+    );
     titleText = theme.textTheme.headlineLarge!.copyWith(
       color: theme.colorScheme.onPrimary,
-    );
-    titleTextSecondary = theme.textTheme.headlineLarge!.copyWith(
-      color: theme.colorScheme.onSecondary,
     );
 
     contextMenuStyle = ContextMenuButtonStyle(
@@ -72,4 +77,18 @@ class Utilities {
     }
     return listString;
   }
+}
+
+class FileCategories {
+  static List<String> audio = [
+    'aac', 'midi', 'mp3', 'ogg', 'wav'
+  ];
+
+  static List<String> images = [
+    'bmp', 'gif', 'jpeg', 'jpg', 'png'
+  ];
+
+  static List<String> videos = [
+    'avi', 'flv', 'mkv', 'mov', 'mp4', 'mpeg', 'webm', 'wmv'
+  ];
 }
