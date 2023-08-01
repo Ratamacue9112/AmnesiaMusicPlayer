@@ -9,7 +9,6 @@ class ContentPlayerPage extends StatefulWidget {
 
 class _ContentPlayerPageState extends State<ContentPlayerPage> {
   Player? videoPlayer;
-  AudioPlayer? audioPlayer;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +16,7 @@ class _ContentPlayerPageState extends State<ContentPlayerPage> {
     
     Widget bodyWidget;
     switch(appState.selectedContent.type) {
-      case FileType.image:
+      case SongContentType.image:
         bodyWidget = Container(
           decoration: BoxDecoration(
             image: DecorationImage(
@@ -28,7 +27,7 @@ class _ContentPlayerPageState extends State<ContentPlayerPage> {
           ),
         );
         break;
-      case FileType.video:
+      case SongContentType.video:
         videoPlayer = Player(id: 0);
         videoPlayer!.open(Media.file(appState.selectedContent.file));
         bodyWidget = Video(
@@ -36,35 +35,38 @@ class _ContentPlayerPageState extends State<ContentPlayerPage> {
           showControls: true, 
         );
         break;
-      case FileType.audio:
-        audioPlayer = AudioPlayer();
+      case SongContentType.audio:
         bodyWidget = Column(
           children: [
-            //const Spacer(),
             Expanded(
               child: Column(
                 children: [
                   Expanded(child: Padding(
                     padding: const EdgeInsets.all(15.0),
-                    child: Image(image: appState.selectedCollection.icon, fit: BoxFit.fill),
+                    child: Image(image: appState.selectedContent.track.collection.icon, fit: BoxFit.fill),
                   )),
                   const SizedBox(height: 20),
-                  Text((appState.selectedContent.track.settings!.get<bool>('workingTitle', false) ? '[${appState.selectedContent.track.name}]' : appState.selectedContent.track.name)
-                    + (appState.selectedContent.isDemo ? ' (Demo)' : !appState.selectedContent.isFinal ? ' - ${appState.selectedContent.name}' : ''),
-                    style: AppStyles.titleText
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(text: appState.selectedContent.track.settings!.get<bool>('workingTitle', false) ? '[${appState.selectedContent.track.name}]' : appState.selectedContent.track.name, style: AppStyles.titleText),
+                        TextSpan(text: appState.selectedContent.isDemo ? ' (Demo)' : !appState.selectedContent.isFinal ? ' - ${appState.selectedContent.name}' : '', style: AppStyles.titleText.copyWith(fontWeight: FontWeight.w200)),
+                      ],
+                    )
                   ),
                   Text('${appState.selectedContent.track.artistName} - ${appState.selectedContent.track.collection.name}', style: AppStyles.largeText.copyWith(fontSize: 20)),
                 ],
               ),
             ),
-            //const Spacer(),
             Padding(
-              padding: const EdgeInsets.only(bottom: 40.0),
-              child: AudioPlayerWidget(player: audioPlayer!),
+              padding: const EdgeInsets.only(bottom: 60.0),
+              child: AudioPlayerWidget(
+                content: appState.currentContentQueue == null ? [appState.selectedContent] : appState.currentContentQueue!,
+                updatePage: () => setState(() {}),
+              ),
             ),
           ],
         );
-        audioPlayer!.play(DeviceFileSource(appState.selectedContent.file.path));
         break;
       default:
         bodyWidget = Center(
@@ -83,11 +85,9 @@ class _ContentPlayerPageState extends State<ContentPlayerPage> {
   @override
   void dispose() {
     if(videoPlayer != null) {
-      videoPlayer!.stop();
+      videoPlayer!.dispose();
     }
-    else if(audioPlayer != null) {
-      audioPlayer!.stop();
-    }
+
     super.dispose();
   }
 }

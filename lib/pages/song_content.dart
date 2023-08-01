@@ -38,11 +38,33 @@ class _SongContentPageState extends State<SongContentPage> {
       );
     }
     else {
-      bodyWidget = ListView.builder(
-        itemCount: content.length,
-        itemBuilder: (context, index) {
-          return SongContentItem(content[index], index, updatePage: () => updateContent(appState.selectedTrack));
-        },
+      bodyWidget = Column(
+        children: [
+          Expanded(
+            child: ListView(
+              children: [
+                for(Content item in content)
+                  SongContentItem(item, content.indexOf(item), updatePage: () => updateContent(appState.selectedTrack)),
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            showDialog(context: context, builder: (context) => EditTextNoteDialog(File(path.join(appState.selectedTrack.directory.path, 'lyrics.txt')), '${appState.selectedTrack.name} - Edit Lyrics'));
+                          }, 
+                          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                          child: Text('Edit Lyrics', style: AppStyles.largeTextSecondary)
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+        ],
       );
     }
 
@@ -66,9 +88,16 @@ class _SongContentPageState extends State<SongContentPage> {
                           const Spacer(),
                           Align(
                             alignment: Alignment.centerLeft,
-                            child: Text(
-                              appState.selectedTrack.settings!.get('workingTitle', false) ? '[${appState.selectedTrack.name}]'  : appState.selectedTrack.name, 
-                              style: AppStyles.titleText.copyWith(fontSize: 50)
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: appState.selectedTrack.settings!.get('workingTitle', false) ? '[${appState.selectedTrack.name}]'  : appState.selectedTrack.name, 
+                                    style: AppStyles.titleText.copyWith(fontSize: 50)
+                                  ),
+                                  TextSpan(text: appState.selectedTrack.hasDemo && !appState.selectedTrack.hasFinal ? ' (Demo)' : '', style: AppStyles.titleText.copyWith(fontWeight: FontWeight.w200))
+                                ],
+                              ),
                             ),
                           ),
                           Align(
@@ -127,26 +156,41 @@ class _SongContentPageState extends State<SongContentPage> {
   void updateContent(Track track) {
     List<Content> newContent = [];
 
+    String demoName = track.settings!.get<String>('demo', '').split('.').first;
+    String finalName = track.settings!.get<String>('final', '').split('.').first;
+
     for(FileSystemEntity item in track.directory.listSync()) {
       if(item is File) {
         String fileName = path.basename(item.path).split('.').first;
         String fileExtension = path.basename(item.path).split('.').last;
-        FileType fileType = FileType.audio;
+        late SongContentType fileType;
 
         if(FileCategories.images.contains(fileExtension)) {
-          fileType = FileType.image;
+          fileType = SongContentType.image;
         }
         else if(FileCategories.videos.contains(fileExtension)) {
-          fileType = FileType.video;
+          fileType = SongContentType.video;
         } 
         else if(FileCategories.audio.contains(fileExtension)) {
-          fileType = FileType.audio;
+          fileType = SongContentType.audio;
         } 
+        else if(fileExtension == 'txt' && !['lyrics', 'settings'].contains(fileName)) {
+          fileType = SongContentType.text;
+        }
         else {
           continue;
         }
 
-        newContent.add(Content(fileName, track, item, fileType));
+        Content content = Content(fileName, track, item, fileType);
+        
+        if(finalName != '' && finalName == fileName) {
+          content.isFinal = true;
+        }
+        else if(demoName != '' && demoName == fileName) {
+          content.isDemo = true;
+        }
+        
+        newContent.add(content);
       }
     }
 
@@ -191,15 +235,17 @@ class _SongContentItemState extends State<SongContentItem> {
 
     IconData icon;
     switch(widget.content.type) {
-      case FileType.image:
+      case SongContentType.image:
         icon = Icons.image;
         break;
-      case FileType.video:
+      case SongContentType.video:
         icon = Icons.movie;
         break;
-      case FileType.audio:
+      case SongContentType.audio:
         icon = Icons.music_note;
         break;
+      case SongContentType.text:
+        icon = Icons.note_alt;
       default:
         icon = Icons.question_mark;
     }
@@ -212,14 +258,67 @@ class _SongContentItemState extends State<SongContentItem> {
         child: ListTile(
           title: Text(widget.content.name, style: AppStyles.largeText),
           leading: Icon(icon, color: theme.colorScheme.onPrimary),
-          tileColor: widget.index % 2 == 0 ? theme.colorScheme.primaryContainer : theme.colorScheme.tertiaryContainer,
+          tileColor: widget.content.isDemo ? const Color.fromARGB(255, 166, 78, 207)
+            : widget.content.isFinal ? const Color.fromARGB(255, 223, 98, 98)
+            : widget.index % 2 == 0 ? theme.colorScheme.primaryContainer : theme.colorScheme.tertiaryContainer,
           onTap: () {
-            appState.selectedContent = widget.content;
-            appState.goToPage(4);
+            if(widget.content.type == SongContentType.text) {
+              showDialog(context: context, builder: (context) => EditTextNoteDialog(widget.content.file, widget.content.name));
+            }
+            else {
+              appState.selectedContent = widget.content;
+              appState.goToPage(4);
+            }
           },
-          trailing:  Wrap(
+          trailing: Wrap(
             direction: Axis.horizontal,
             children: [
+              // Set as final
+              Visibility(
+                visible: isHovering && widget.content.type == SongContentType.audio,
+                child: IconButton(
+                  onPressed: () {
+                    if(!widget.content.isDemo) {
+                      widget.content.isFinal = !widget.content.isFinal;
+                      widget.content.track.hasFinal = !widget.content.track.hasFinal;
+                      if(!widget.content.isFinal) {
+                        widget.content.track.settings!.set('final', '');
+                      }
+                      else {
+                        widget.content.track.settings!.set('final', path.basename(widget.content.file.path));
+                      }
+                      widget.content.track.settings!.save();
+
+                      widget.updatePage();
+                    }
+                  },
+                  icon: Icon(widget.content.isFinal ? Icons.star : Icons.star_border, color: theme.colorScheme.secondaryContainer),
+                  tooltip: 'Set as final',
+                )
+              ),
+              // Set as demo
+              Visibility(
+                visible: isHovering && widget.content.type == SongContentType.audio,
+                child: IconButton(
+                  onPressed: () {
+                    if(!widget.content.isFinal) {
+                      widget.content.isDemo = !widget.content.isDemo;
+                      widget.content.track.hasDemo = !widget.content.track.hasDemo;
+                      if(!widget.content.isDemo) {
+                        widget.content.track.settings!.set('demo', '');
+                      }
+                      else {
+                        widget.content.track.settings!.set('demo', path.basename(widget.content.file.path));
+                      }
+                      widget.content.track.settings!.save();
+
+                      widget.updatePage();
+                    }
+                  },
+                  icon: Icon(widget.content.isDemo ? Icons.check_circle : Icons.check_circle_outline, color: theme.colorScheme.secondaryContainer),
+                  tooltip: 'Set as demo',
+                )
+              ),
               // Rename
               Visibility(
                 visible: isHovering,
@@ -256,7 +355,6 @@ class _SongContentItemState extends State<SongContentItem> {
                                   if(newFile.existsSync()) return;
 
                                   widget.content.file.renameSync(newFile.path);
-
                                   widget.updatePage();
                                   Navigator.pop(context);
                                 },
@@ -266,6 +364,10 @@ class _SongContentItemState extends State<SongContentItem> {
                               TextButton(
                                 onPressed: () {
                                   Navigator.pop(context);
+                                  stfSetState(() {
+                                    currentContentRename = widget.content.name;
+                                    renameController.value = TextEditingValue(text: widget.content.name);
+                                  });
                                 },
                                 child: const Text('Cancel'),
                               )
@@ -322,10 +424,18 @@ class _SongContentItemState extends State<SongContentItem> {
   }
 }
 
-class AddContentChooseFileTypeDialog extends StatelessWidget {
+class AddContentChooseFileTypeDialog extends StatefulWidget {
   const AddContentChooseFileTypeDialog({required this.updatePage, super.key});
 
   final Function updatePage;
+
+  @override
+  State<AddContentChooseFileTypeDialog> createState() => _AddContentChooseFileTypeDialogState();
+}
+
+class _AddContentChooseFileTypeDialogState extends State<AddContentChooseFileTypeDialog> {
+  TextEditingController nameController = TextEditingController();
+  String currentTextNoteName = '';
 
   @override
   Widget build(BuildContext context) {
@@ -345,7 +455,7 @@ class AddContentChooseFileTypeDialog extends StatelessWidget {
                   child: Tooltip(
                     message: 'Add image',
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: () {
                         openFileDialog(FileType.image, appState.selectedTrack.directory);
                         Navigator.pop(context);
                       },
@@ -378,6 +488,13 @@ class AddContentChooseFileTypeDialog extends StatelessWidget {
                     ),
                   )
                 ),
+              ]
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 // Add audio
                 Expanded(
                   child: Tooltip(
@@ -391,12 +508,82 @@ class AddContentChooseFileTypeDialog extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(0.0)
                         ),
-                        backgroundColor: theme.colorScheme.primaryContainer
+                        backgroundColor: theme.colorScheme.tertiaryContainer
                       ),
                       child: Icon(Icons.music_note, size: 100, color: theme.colorScheme.onPrimary)
                     ),
                   )
-                )
+                ),
+                 // Add text note
+                Expanded(
+                  child: Tooltip(
+                    message: 'Add text note',
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        showDialog(context: context, builder: (context) {
+                          return StatefulBuilder(
+                            builder: (stfContext, stfSetState) {
+                              return AlertDialog(
+                                title: Text('Create text note', style: AppStyles.mediumText),
+                                backgroundColor: theme.colorScheme.secondaryContainer,
+                                content: TextField(
+                                  decoration: InputDecoration(
+                                    border: const OutlineInputBorder(),
+                                    filled: true,
+                                    fillColor: theme.colorScheme.secondaryContainer,
+                                    hintText: 'Enter note name here',
+                                  ),
+                                  controller: nameController,
+                                  
+                                  onChanged: (value) => {
+                                    stfSetState(() {
+                                      currentTextNoteName = value;
+                                    })
+                                  },
+                                ),
+                                actions: [
+                                  // Confirm
+                                  TextButton(
+                                    onPressed: () {
+                                      if(['', 'lyrics', 'settings'].contains(currentTextNoteName)) return;
+                                      File file = File(path.join(appState.selectedTrack.directory.path, '$currentTextNoteName.txt'));
+
+                                      if(file.existsSync()) return;
+
+                                      file.createSync();
+                                      widget.updatePage();
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('Confirm'),
+                                  ),
+                                  // Cancel
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      stfSetState(() {
+                                        currentTextNoteName = '';
+                                        nameController.value = const TextEditingValue(text: '');
+                                      });
+                                    },
+                                    child: const Text('Cancel'),
+                                  )
+                                ],
+                              );
+                            }
+                          );
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(0.0)
+                        ),
+                        backgroundColor: theme.colorScheme.primaryContainer
+                      ),
+                      child: Icon(Icons.note_alt, size: 100, color: theme.colorScheme.onPrimary)
+                    ),
+                  )
+                ),
               ],
             ),
           ),
@@ -434,6 +621,111 @@ class AddContentChooseFileTypeDialog extends StatelessWidget {
       File(result.files.single.path!).copySync(path.join(trackDirectory.path, path.basename(result.files.single.path!)));
     }
 
-    updatePage();
+    widget.updatePage();
+  }
+}
+
+class EditTextNoteDialog extends StatefulWidget {
+  const EditTextNoteDialog(this.file, this.title, {super.key});
+
+  final File file;
+  final String title;
+
+  @override
+  State<EditTextNoteDialog> createState() => _EditTextNoteDialogState();
+}
+
+class _EditTextNoteDialogState extends State<EditTextNoteDialog> {
+  TextEditingController nameController = TextEditingController();
+  String currentNoteText = '';
+  
+  @override
+  void initState() {
+    super.initState();
+    if(!widget.file.existsSync()) {
+      widget.file.createSync();
+    }
+
+    setState(() {
+      currentNoteText = widget.file.readAsStringSync();
+      nameController.value = TextEditingValue(text: currentNoteText);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+
+    return Dialog(
+      backgroundColor: theme.colorScheme.primaryContainer,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            children: [
+              // Title
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: Text(widget.title, style: AppStyles.titleText)
+              ),
+              // Text field
+              Padding(
+                padding: const EdgeInsets.all(14.0),
+                child: SizedBox(
+                  height: constraints.maxHeight - 135,
+                  child: TextField(
+                    autofocus: true,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: theme.colorScheme.secondaryContainer,
+                      hintText: 'Make notes here',
+                    ),
+                    controller: nameController,
+                    
+                    onChanged: (value) => {
+                      setState(() {
+                        currentNoteText = value;
+                      })
+                    },
+                  ),
+                ),
+              ),
+              // Cancel or confirm
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                child: Row(
+                  children: [
+                    // Cancel
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        }, 
+                        style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                        child: Text('Cancel', style: AppStyles.mediumTextSecondary)
+                      )
+                    ),
+                    const SizedBox(width: 6.0),
+                    // Confirm
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.file.writeAsStringSync(currentNoteText);
+                          Navigator.pop(context);
+                        }, 
+                        style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                        child: Text('Confirm', style: AppStyles.mediumTextSecondary)
+                      )
+                    )
+                  ],
+                ),
+              )
+            ],
+          );
+        }
+      )
+    );
   }
 }

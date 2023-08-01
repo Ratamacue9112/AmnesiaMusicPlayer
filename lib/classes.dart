@@ -37,13 +37,20 @@ class Content {
   final String name;
   final Track track;
   final File file;
-  final FileType type;
+  final SongContentType type;
   bool isDemo = false;
   bool isFinal = false;
 
   Content(this.name, this.track, this.file, this.type);
 
-  static Content empty = Content('', Track.empty, File(''), FileType.any);
+  static Content empty = Content('', Track.empty, File(''), SongContentType.text);
+}
+
+enum SongContentType {
+  image,
+  video,
+  audio,
+  text,
 }
 
 class Settings {
@@ -58,6 +65,9 @@ class Settings {
 
     if(T == bool) {
       return (settings[setting] == 'true') as T;
+    }
+    if(T == String) {
+      return settings[setting].toString() as T;
     }
 
     return defaultValue;

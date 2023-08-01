@@ -119,7 +119,34 @@ class _TracklistPageState extends State<TracklistPage> {
                 tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
                 updateTracklist(appState.selectedCollection);
               },
+              getQueue: (startIndex) => getQueue(startIndex),
             ),
+          Visibility(
+            visible: getQueue(0).isNotEmpty,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        List<Content> queue = getQueue(0);
+                        if(queue.isNotEmpty) {
+                          queue.shuffle();
+                          appState.currentContentQueue = queue;
+                          appState.selectedContent = queue.first;
+                          appState.goToPage(4);
+                        }
+                      }, 
+                      style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                      icon: Icon(Icons.shuffle, color: theme.colorScheme.onSecondary), 
+                      label: Text('Shuffle', style: AppStyles.largeTextSecondary)
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 75)
         ],
       );
@@ -162,7 +189,6 @@ class _TracklistPageState extends State<TracklistPage> {
             if(isUncategorized) {
               return AddTrackNewDialog(updatePage: () {
                 updateUncategorized(appState.selectedCollection);
-                
               });
             }
             return AddTrackChooseDialog(updatePage: () {
@@ -204,6 +230,9 @@ class _TracklistPageState extends State<TracklistPage> {
       if(songDirectories.contains(line)) {
         Track track = Track(line, collection.artistName, collection, Directory(path.join(songsParentDirectory.path, line)));
         track.settings!.read();
+        track.hasDemo = track.settings!.get<String>('demo', '') != '';
+        track.hasFinal = track.settings!.get<String>('final', '') != '';
+        
         newTracklist.add(track);
       }
       else {
@@ -235,12 +264,36 @@ class _TracklistPageState extends State<TracklistPage> {
       String songName = path.basename(item.path);
       Track track = Track(songName, collection.artistName, collection, Directory(item.path));
       track.settings!.read();
+      track.hasDemo = track.settings!.get<String>('demo', '') != '';
+      track.hasFinal = track.settings!.get<String>('final', '') != '';
       if(!usedSongs.contains(songName)) unusedSongs.add(track);
     }
 
     setState(() {
       tracklist = unusedSongs;
     });
+  }
+
+  List<Content> getQueue(int startIndex) {
+    List<Content> queue = [];
+
+    for(int i = startIndex; i < tracklist.length; i++) {
+      if(tracklist[i].hasFinal || tracklist[i].hasDemo) {
+        if(!tracklist[i].hasFinal) {
+          final demoName = tracklist[i].settings!.get<String>('demo', '');
+          Content content = Content(demoName.split('.').first, tracklist[i], File(path.join(tracklist[i].directory.path, demoName)), SongContentType.audio);
+          content.isDemo = true;
+          queue.add(content);
+        }
+        else {
+          final finalName = tracklist[i].settings!.get<String>('final', '');
+          Content content = Content(finalName.split('.').first, tracklist[i], File(path.join(tracklist[i].directory.path, finalName)), SongContentType.audio);
+          content.isFinal = true;
+          queue.add(content);
+        }
+      }
+    }
+    return queue;
   }
 }
 
@@ -251,8 +304,9 @@ class TracklistItem extends StatefulWidget {
 
   final Function(String item) deleteItem;
   final Function(int index, bool up) moveItem;
+  final List<Content> Function(int startIndex) getQueue;
 
-  const TracklistItem(this.track, this.trackNumber, this.isUncategorized, {required this.deleteItem, required this.moveItem, super.key});
+  const TracklistItem(this.track, this.trackNumber, this.isUncategorized, {required this.deleteItem, required this.moveItem, required this.getQueue, super.key});
 
   @override
   State<TracklistItem> createState() => _TracklistItemState();
@@ -270,8 +324,16 @@ class _TracklistItemState extends State<TracklistItem> {
       height: 40,
       child: GestureDetector(
         onTap: () {
-          appState.selectedTrack = widget.track;
-          appState.goToPage(3);
+          if(!widget.track.hasDemo && !widget.track.hasFinal) {
+            appState.selectedTrack = widget.track;
+            appState.goToPage(3);
+          }
+          else {
+            appState.currentContentQueue = widget.getQueue(widget.trackNumber - 1);
+            appState.selectedContent = appState.currentContentQueue!.first;
+            appState.goToPage(4);
+          }
+
         },
         child: MouseRegion(
           onEnter: (event) => setState(() => isHovering = true),
@@ -293,6 +355,7 @@ class _TracklistItemState extends State<TracklistItem> {
                               text: widget.track.settings!.get<bool>('workingTitle', false) ? '[${widget.track.name}]' : widget.track.name, 
                               style: AppStyles.largeText.copyWith(fontWeight: widget.track.hasDemo || widget.track.hasFinal ? FontWeight.normal : FontWeight.w300)
                             ),
+                            TextSpan(text: widget.track.hasDemo && !widget.track.hasFinal ? ' (Demo)' : '', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w200))
                           ]
                         )
                       )
@@ -503,7 +566,10 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   child: ListTile(
-                    title: Text(filteredSongs.values.elementAt(index).get<bool>('workingTitle', false) ? '[${filteredSongs.keys.elementAt(index)}]' : filteredSongs.keys.elementAt(index)),
+                    title: Text(
+                      (filteredSongs.values.elementAt(index).get<bool>('workingTitle', false) ? '[${filteredSongs.keys.elementAt(index)}]' : filteredSongs.keys.elementAt(index)) 
+                      + (filteredSongs.values.elementAt(index).get('demo', '') != '' && filteredSongs.values.elementAt(index).get('final', '') == '' ? ' (Demo)' : '')
+                    ),
                     tileColor: theme.colorScheme.secondaryContainer,
                     onTap: () {
                       List<String> newTracklist = alreadyAddedSongs;

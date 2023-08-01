@@ -45,6 +45,7 @@ class AppState extends ChangeNotifier {
   Collection selectedCollection = Collection.empty;
   Track selectedTrack = Track.empty;
   Content selectedContent = Content.empty;
+  List<Content>? currentContentQueue;
 
   void goToPage(int index) {
     navigationSelectedIndex = index;

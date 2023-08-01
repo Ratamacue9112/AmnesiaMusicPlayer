@@ -1,186 +1,241 @@
-import 'dart:async';
-
 import 'package:amnesia_music_player/globals.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/material.dart';
+import 'package:path/path.dart' as path;
+import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
+import 'package:rxdart/rxdart.dart';
 
 class AudioPlayerWidget extends StatefulWidget {
-  final AudioPlayer player;
+  const AudioPlayerWidget({required this.content, required this.updatePage, super.key});
 
-  const AudioPlayerWidget({required this.player, super.key});
+  final List<Content> content;
+  final Function() updatePage;
 
   @override
-  State<StatefulWidget> createState() {
-    return _AudioPlayerWidgetState();
-  }
+  _AudioPlayerWidgetState createState() => _AudioPlayerWidgetState();
 }
 
 class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
-  PlayerState? _playerState;
-  Duration? _duration;
-  Duration? _position;
+  int playlistIndex = 0;
+  late AudioPlayer player;
 
-  StreamSubscription? _durationSubscription;
-  StreamSubscription? _positionSubscription;
-  StreamSubscription? _playerCompleteSubscription;
-  StreamSubscription? _playerStateChangeSubscription;
-
-  bool get _isPlaying => _playerState == PlayerState.playing;
-
-  bool get _isPaused => _playerState == PlayerState.paused;
-
-  String get _durationText => _duration?.toString().split('.').first ?? '';
-
-  String get _positionText => _position?.toString().split('.').first ?? '';
-
-  AudioPlayer get player => widget.player;
+  Stream<PositionData> get positionDataStream =>
+    Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
+      player.positionStream, 
+      player.bufferedPositionStream, 
+      player.durationStream, 
+      (position, bufferedPosition, duration) => PositionData(
+        position, 
+        bufferedPosition, 
+        duration ?? Duration.zero
+      ),
+    );
 
   @override
   void initState() {
     super.initState();
-    // Use initial values from player
-    _playerState = player.state;
-    player.getDuration().then(
-          (value) => setState(() {
-            _duration = value;
-          }),
-        );
-    player.getCurrentPosition().then(
-          (value) => setState(() {
-            _position = value;
-          }),
-        );
-    _initStreams();
-  }
-
-  @override
-  void setState(VoidCallback fn) {
-    // Subscriptions only can be closed asynchronously,
-    // therefore events can occur after widget has been disposed.
-    if (mounted) {
-      super.setState(fn);
-    }
+    player = AudioPlayer();
+    player.setAudioSource(ConcatenatingAudioSource(children: [
+      for(Content content in widget.content)
+        AudioSource.file(content.file.path)
+    ]));
+    player.play();
   }
 
   @override
   void dispose() {
-    _durationSubscription?.cancel();
-    _positionSubscription?.cancel();
-    _playerCompleteSubscription?.cancel();
-    _playerStateChangeSubscription?.cancel();
+    _dispose();
     super.dispose();
   }
 
+  // I should really dispose the player but whenever I do it crashes so I guess I'm just going to have to deal with this
+  void _dispose() async {
+    await player.pause();
+  }
+  
   @override
   Widget build(BuildContext context) {
     ThemeData theme = Theme.of(context);
+    AppState appState = context.watch<AppState>();
+
+    const double iconSize = 60.0;
+    File lyricsFile = File(path.join(appState.selectedContent.track.directory.path, 'lyrics.txt'));
+    String lyrics = '';
+    if(lyricsFile.existsSync()) lyrics = lyricsFile.readAsStringSync();
+
+    // Previous and next button don't work half the time but oh well
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
+      children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(
-              key: const Key('play_button'),
-              onPressed: _isPlaying ? null : _play,
-              iconSize: 48.0,
-              icon: const Icon(Icons.play_arrow),
-              color: theme.colorScheme.onSecondary,
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: IconButton(
+                onPressed: () async {
+                  await player.seekToPrevious();
+                },
+                iconSize: iconSize,
+                color: theme.colorScheme.secondaryContainer,
+                icon: const Icon(Icons.skip_previous)
+              ),
             ),
-            IconButton(
-              key: const Key('pause_button'),
-              onPressed: _isPlaying ? _pause : null,
-              iconSize: 48.0,
-              icon: const Icon(Icons.pause),
-              color: theme.colorScheme.onSecondary,
+            // Play or pause
+            StreamBuilder<PlayerState>(
+              stream: player.playerStateStream,
+              builder: (context, snapshot) {
+                final playerState = snapshot.data;
+                final processingState = playerState?.processingState;
+                final player = playerState?.playing;
+
+                if(!(player ?? false)) {
+                  return IconButton(
+                    onPressed: this.player.play,
+                    iconSize: iconSize,
+                    color: theme.colorScheme.secondaryContainer,
+                    icon: const Icon(Icons.play_arrow)
+                  );
+                } else if(processingState != ProcessingState.completed) {
+                  return IconButton(
+                    onPressed:this.player.pause,
+                    iconSize: iconSize,
+                    color: theme.colorScheme.secondaryContainer,
+                    icon: const Icon(Icons.pause)
+                  );
+                }
+                return Icon(
+                  Icons.play_arrow,
+                  size: iconSize,
+                  color: theme.colorScheme.secondaryContainer
+                );
+              },
             ),
-            IconButton(
-              key: const Key('stop_button'),
-              onPressed: _isPlaying || _isPaused ? _stop : null,
-              iconSize: 48.0,
-              icon: const Icon(Icons.stop),
-              color: theme.colorScheme.onSecondary,
+            // Skip to next
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: IconButton(
+                onPressed: () async {
+                  await player.seekToNext();
+                  await player.seek(Duration.zero);
+                },
+                iconSize: iconSize,
+                color: playlistIndex == widget.content.length - 1 ? theme.colorScheme.tertiaryContainer : theme.colorScheme.secondaryContainer,
+                icon: const Icon(Icons.skip_next)
+              ),
             ),
           ],
         ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            thumbColor: theme.colorScheme.secondaryContainer,
-            activeTrackColor: theme.colorScheme.tertiaryContainer,
-            overlayColor: const Color.fromARGB(0, 0, 0, 0),
-          ),
-          child: Slider(
-            onChanged: (v) {
-              final duration = _duration;
-              if (duration == null) {
-                return;
-              }
-              final position = v * duration.inMilliseconds;
-              player.seek(Duration(milliseconds: position.round()));
-            },
-            value: (_position != null &&
-                    _duration != null &&
-                    _position!.inMilliseconds > 0 &&
-                    _position!.inMilliseconds < _duration!.inMilliseconds)
-                ? _position!.inMilliseconds / _duration!.inMilliseconds
-                : 0.0,
-          ),
+        // Show lyrics
+        Visibility(
+          visible: lyrics.isNotEmpty,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: IconButton(
+              onPressed: () {
+                showDialog(context: context, builder: (context) {
+                  return Dialog(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Column(
+                          children: [
+                            // Title
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10.0),
+                              child: Text('${appState.selectedContent.track.name} - Lyrics', style:  AppStyles.largeText.copyWith(fontSize: 50)),
+                            ),
+                            // Lyrics
+                            Padding(
+                              padding: const EdgeInsets.all(10.0),
+                              child: SizedBox(
+                                width: constraints.maxWidth - 50,
+                                height: constraints.maxHeight - 160,
+                                child: SingleChildScrollView(
+                                  child: Text(lyrics, style: AppStyles.largeText.copyWith(fontSize: 20))
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            // Close
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    }, 
+                                    style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+                                    child: Text('Close', style: AppStyles.mediumTextSecondary)
+                                  ),
+                                ),
+                              ],
+                            )
+                          ],
+                        );
+                      }
+                    )
+                  );
+                });
+              },
+              iconSize: iconSize,
+              color: theme.colorScheme.secondaryContainer,
+              icon: const Icon(Icons.lyrics)
+            ),
+          )
         ),
-        Text(
-          _position != null
-              ? '$_positionText / $_durationText'
-              : _duration != null
-                  ? _durationText
-                  : '',
-          style: AppStyles.largeText,
+        ElevatedButton.icon(
+          onPressed: () {
+            player.setLoopMode(LoopMode.values[(LoopMode.values.indexOf(player.loopMode) + 1) % LoopMode.values.length]);
+            setState(() {});
+          }, 
+          icon: Icon(Icons.loop, color: theme.colorScheme.onSecondary),
+          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondaryContainer),
+          label: Text(
+            player.loopMode == LoopMode.one ? 'Loop One' 
+            : player.loopMode == LoopMode.all ? 'Loop All' : 'Loop Off',
+            style: AppStyles.largeTextSecondary,
+          )
         ),
+        const SizedBox(height: 10),
+        StreamBuilder<PositionData>(
+          stream: positionDataStream,
+          builder: (context, snapshot) {
+            final positionData = snapshot.data;
+            if(player.currentIndex != null && player.currentIndex != playlistIndex) {
+              Future.delayed(Duration.zero, () {
+                setState(() {
+                  playlistIndex = player.currentIndex!;
+                });
+                appState.selectedContent = widget.content[playlistIndex];
+                widget.updatePage();
+              });
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: ProgressBar(
+                progress: positionData?.position ?? Duration.zero,
+                buffered: positionData?.bufferedPosition ?? Duration.zero,
+                total: positionData?.duration ?? Duration.zero,
+                onSeek: player.seek,
+            
+                timeLabelTextStyle: AppStyles.largeText,
+                thumbColor: theme.colorScheme.secondaryContainer,
+                thumbGlowColor: Colors.transparent,
+                baseBarColor: theme.colorScheme.primaryContainer,
+                bufferedBarColor: theme.colorScheme.tertiaryContainer,
+                progressBarColor: theme.colorScheme.secondaryContainer,
+              ),
+            );
+          },
+        )
       ],
     );
   }
+}
 
-  void _initStreams() {
-    _durationSubscription = player.onDurationChanged.listen((duration) {
-      setState(() => _duration = duration);
-    });
+class PositionData {
+  const PositionData(this.position, this.bufferedPosition, this.duration);
 
-    _positionSubscription = player.onPositionChanged.listen(
-      (p) => setState(() => _position = p),
-    );
-
-    _playerCompleteSubscription = player.onPlayerComplete.listen((event) {
-      setState(() {
-        _playerState = PlayerState.stopped;
-        _position = Duration.zero;
-      });
-    });
-
-    _playerStateChangeSubscription =
-        player.onPlayerStateChanged.listen((state) {
-      setState(() {
-        _playerState = state;
-      });
-    });
-  }
-
-  Future<void> _play() async {
-    final position = _position;
-    if (position != null && position.inMilliseconds > 0) {
-      await player.seek(position);
-    }
-    await player.resume();
-    setState(() => _playerState = PlayerState.playing);
-  }
-
-  Future<void> _pause() async {
-    await player.pause();
-    setState(() => _playerState = PlayerState.paused);
-  }
-
-  Future<void> _stop() async {
-    await player.stop();
-    setState(() {
-      _playerState = PlayerState.stopped;
-      _position = Duration.zero;
-    });
-  }
+  final Duration position;
+  final Duration bufferedPosition;
+  final Duration duration;
 }

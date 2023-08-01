@@ -19,7 +19,7 @@ export 'widgets/audio_player_widget.dart';
 export 'package:file_picker/file_picker.dart';
 export 'package:context_menus/context_menus.dart';
 export 'package:dart_vlc/dart_vlc.dart';
-export 'package:audioplayers/audioplayers.dart';
+export 'package:just_audio/just_audio.dart';
 
 import 'dart:io';
 import 'package:amnesia_music_player/classes.dart';
