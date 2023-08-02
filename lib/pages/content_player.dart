@@ -77,7 +77,7 @@ class _ContentPlayerPageState extends State<ContentPlayerPage> {
 
     return Scaffold(
       body: Center(
-        child: Expanded(child: bodyWidget)
+        child: bodyWidget
       )
     );
   }

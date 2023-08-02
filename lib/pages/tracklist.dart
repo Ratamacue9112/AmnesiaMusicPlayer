@@ -180,7 +180,7 @@ class _TracklistPageState extends State<TracklistPage> {
               ],
             ),
           ),
-          Expanded(child: bodyWidget),
+          bodyWidget,
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -342,76 +342,75 @@ class _TracklistItemState extends State<TracklistItem> {
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Container(
               color: widget.trackNumber % 2 == 0 ? theme.colorScheme.tertiaryContainer : theme.colorScheme.primaryContainer,
-              child: Expanded(
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(text: '${widget.trackNumber}.   ', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w100)),
-                            TextSpan(
-                              text: widget.track.settings!.get<bool>('workingTitle', false) ? '[${widget.track.name}]' : widget.track.name, 
-                              style: AppStyles.largeText.copyWith(fontWeight: widget.track.hasDemo || widget.track.hasFinal ? FontWeight.normal : FontWeight.w300)
-                            ),
-                            TextSpan(text: widget.track.hasDemo && !widget.track.hasFinal ? ' (Demo)' : '', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w200))
-                          ]
-                        )
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(text: '${widget.trackNumber}.   ', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w100)),
+                          TextSpan(
+                            text: widget.track.settings!.get<bool>('workingTitle', false) ? '[${widget.track.name}]' : widget.track.name, 
+                            style: AppStyles.largeText.copyWith(fontWeight: widget.track.hasDemo || widget.track.hasFinal ? FontWeight.normal : FontWeight.w300)
+                          ),
+                          TextSpan(text: widget.track.hasDemo && !widget.track.hasFinal ? ' (Demo)' : '', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w200))
+                        ]
                       )
-                    ),
-                    const Spacer(),
-                    // Open content
-                    Visibility(
-                      visible: widget.isUncategorized ? false : isHovering,
-                      child: IconButton(
-                        onPressed: () {
-                          appState.selectedTrack = widget.track;
-                          appState.goToPage(3);
-                        },
-                        icon: Icon(Icons.more_horiz, color: theme.colorScheme.secondaryContainer),
-                        tooltip: 'Open content',
-                      )
-                    ),
-                    // Move up
-                    Visibility(
-                      visible: widget.isUncategorized ? false : isHovering,
-                      child: IconButton(
-                        onPressed: () {
-                          widget.moveItem(widget.trackNumber - 1, true);
-                        },
-                        icon: Icon(Icons.arrow_upward, color: theme.colorScheme.secondaryContainer),
-                        tooltip: 'Move up',
-                      )
-                    ),
-                    // Move down
-                    Visibility(
-                      visible: widget.isUncategorized ? false : isHovering,
-                      child: IconButton(
-                        onPressed: () {
-                          widget.moveItem(widget.trackNumber - 1, false);
-                        },
-                        icon: Icon(Icons.arrow_downward, color: theme.colorScheme.secondaryContainer), 
-                        tooltip: 'Move down',
-                      )
-                    ),
-                    // Delete
-                    Padding(
-                      padding: const EdgeInsets.only(right: 5.0),
-                      child: Visibility(
-                        visible: isHovering,
-                        child: IconButton(
-                          onPressed: () {
-                            widget.deleteItem(widget.track.name);
-                          },
-                          icon: Icon(widget.isUncategorized ? Icons.delete : Icons.highlight_remove, color: theme.colorScheme.secondaryContainer),
-                          tooltip: 'Remove',
-                        )
-                      ),
                     )
-                  ],
-                )
-              ),
+                  ),
+                  const Spacer(),
+                  // Open content
+                  Visibility(
+                    visible: widget.isUncategorized ? false : isHovering,
+                    child: IconButton(
+                      onPressed: () {
+                        appState.selectedTrack = widget.track;
+                        appState.goToPage(3);
+                      },
+                      icon: Icon(Icons.more_horiz, color: theme.colorScheme.secondaryContainer),
+                      tooltip: 'Open content',
+                    )
+                  ),
+                  // Move up
+                  Visibility(
+                    visible: widget.isUncategorized ? false : isHovering,
+                    child: IconButton(
+                      onPressed: () {
+                        widget.moveItem(widget.trackNumber - 1, true);
+                      },
+                      icon: Icon(Icons.arrow_upward, color: theme.colorScheme.secondaryContainer),
+                      tooltip: 'Move up',
+                    )
+                  ),
+                  // Move down
+                  Visibility(
+                    visible: widget.isUncategorized ? false : isHovering,
+                    child: IconButton(
+                      onPressed: () {
+                        widget.moveItem(widget.trackNumber - 1, false);
+                      },
+                      icon: Icon(Icons.arrow_downward, color: theme.colorScheme.secondaryContainer), 
+                      tooltip: 'Move down',
+                    )
+                  ),
+                  // Delete
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: Visibility(
+                      visible: isHovering,
+                      child: IconButton(
+                        onPressed: () {
+                          widget.deleteItem(widget.track.name);
+                        },
+                        icon: Icon(widget.isUncategorized ? Icons.delete : Icons.highlight_remove, color: theme.colorScheme.secondaryContainer),
+                        tooltip: 'Remove',
+                      )
+                    ),
+                  )
+                ],
+              )
             ),
           ),
         ),
