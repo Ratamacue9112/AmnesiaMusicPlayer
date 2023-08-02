@@ -21,6 +21,7 @@ class Track {
   final String artistName;
   final Collection collection;
   Directory directory;
+  String demoTitleNote = '';
   bool hasDemo = false;
   bool hasFinal = false;
 
@@ -97,7 +98,7 @@ class Settings {
     }
 
     File settingsFile = File(path.join(songDirectory.path, 'settings.txt'));
-    if(!settingsFile.existsSync()) settingsFile.createSync();
+    if(!settingsFile.existsSync()) settingsFile.createSync(recursive: true);
 
     settingsFile.writeAsStringSync(settingsString);
   }

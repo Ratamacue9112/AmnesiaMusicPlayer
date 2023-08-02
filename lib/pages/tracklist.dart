@@ -232,6 +232,8 @@ class _TracklistPageState extends State<TracklistPage> {
         track.settings!.read();
         track.hasDemo = track.settings!.get<String>('demo', '') != '';
         track.hasFinal = track.settings!.get<String>('final', '') != '';
+        String demoTitleNote = track.settings!.get('demoTitleNote', '');
+        track.demoTitleNote = demoTitleNote.isEmpty ? 'Demo' : demoTitleNote;
         
         newTracklist.add(track);
       }
@@ -266,6 +268,9 @@ class _TracklistPageState extends State<TracklistPage> {
       track.settings!.read();
       track.hasDemo = track.settings!.get<String>('demo', '') != '';
       track.hasFinal = track.settings!.get<String>('final', '') != '';
+      String demoTitleNote = track.settings!.get('demoTitleNote', '');
+      track.demoTitleNote = demoTitleNote.isEmpty ? 'Demo' : demoTitleNote;
+
       if(!usedSongs.contains(songName)) unusedSongs.add(track);
     }
 
@@ -330,8 +335,10 @@ class _TracklistItemState extends State<TracklistItem> {
           }
           else {
             appState.currentContentQueue = widget.getQueue(widget.trackNumber - 1);
-            appState.selectedContent = appState.currentContentQueue!.first;
-            appState.goToPage(4);
+            if(appState.currentContentQueue!.isNotEmpty) {
+              appState.selectedContent = appState.currentContentQueue!.first;
+              appState.goToPage(4);
+            }
           }
 
         },
@@ -355,7 +362,7 @@ class _TracklistItemState extends State<TracklistItem> {
                             text: widget.track.settings!.get<bool>('workingTitle', false) ? '[${widget.track.name}]' : widget.track.name, 
                             style: AppStyles.largeText.copyWith(fontWeight: widget.track.hasDemo || widget.track.hasFinal ? FontWeight.normal : FontWeight.w300)
                           ),
-                          TextSpan(text: widget.track.hasDemo && !widget.track.hasFinal ? ' (Demo)' : '', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w200))
+                          TextSpan(text: widget.track.hasDemo && !widget.track.hasFinal ? ' (${widget.track.demoTitleNote})' : '', style: AppStyles.largeText.copyWith(fontWeight: FontWeight.w200))
                         ]
                       )
                     )
@@ -363,7 +370,7 @@ class _TracklistItemState extends State<TracklistItem> {
                   const Spacer(),
                   // Open content
                   Visibility(
-                    visible: widget.isUncategorized ? false : isHovering,
+                    visible: isHovering,
                     child: IconButton(
                       onPressed: () {
                         appState.selectedTrack = widget.track;
@@ -565,10 +572,7 @@ class _AddTrackExistingDialogState extends State<AddTrackExistingDialog> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   child: ListTile(
-                    title: Text(
-                      (filteredSongs.values.elementAt(index).get<bool>('workingTitle', false) ? '[${filteredSongs.keys.elementAt(index)}]' : filteredSongs.keys.elementAt(index)) 
-                      + (filteredSongs.values.elementAt(index).get('demo', '') != '' && filteredSongs.values.elementAt(index).get('final', '') == '' ? ' (Demo)' : '')
-                    ),
+                    title: Text(filteredSongs.values.elementAt(index).get<bool>('workingTitle', false) ? '[${filteredSongs.keys.elementAt(index)}]' : filteredSongs.keys.elementAt(index)),
                     tileColor: theme.colorScheme.secondaryContainer,
                     onTap: () {
                       List<String> newTracklist = alreadyAddedSongs;
@@ -785,10 +789,12 @@ class _AddTrackNewDialogState extends State<AddTrackNewDialog> {
                               settings.set('workingTitle', currentTrackIsWorkingTitle);
                               settings.save();
 
-                              File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
-                              List<String> tracklist = tracklistFile.readAsLinesSync();
-                              tracklist.add(currentTrackName);
-                              tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                              if(appState.selectedCollection.name != 'Uncategorized') {
+                                File tracklistFile = File(path.join(appState.selectedCollection.directory.path, 'tracklist.txt'));
+                                List<String> tracklist = tracklistFile.readAsLinesSync();
+                                tracklist.add(currentTrackName);
+                                tracklistFile.writeAsStringSync(Utilities.listToString(tracklist));
+                              }
                             }
 
                             widget.updatePage();

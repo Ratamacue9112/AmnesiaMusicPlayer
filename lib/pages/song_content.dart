@@ -95,7 +95,10 @@ class _SongContentPageState extends State<SongContentPage> {
                                     text: appState.selectedTrack.settings!.get('workingTitle', false) ? '[${appState.selectedTrack.name}]'  : appState.selectedTrack.name, 
                                     style: AppStyles.titleText.copyWith(fontSize: 50)
                                   ),
-                                  TextSpan(text: appState.selectedTrack.hasDemo && !appState.selectedTrack.hasFinal ? ' (Demo)' : '', style: AppStyles.titleText.copyWith(fontWeight: FontWeight.w200))
+                                  TextSpan(
+                                    text: appState.selectedTrack.hasDemo && !appState.selectedTrack.hasFinal ? ' (${appState.selectedTrack.demoTitleNote})'  : '', 
+                                    style: AppStyles.titleText.copyWith(fontSize: 30, fontWeight: FontWeight.w200)
+                                  ),
                                 ],
                               ),
                             ),
@@ -215,14 +218,19 @@ class SongContentItem extends StatefulWidget {
 class _SongContentItemState extends State<SongContentItem> {
   bool isHovering = false;
   String currentContentRename = '';
+  String currentTitleNote = '';
 
   TextEditingController renameController = TextEditingController();
+  TextEditingController titleNoteController = TextEditingController();
 
   @override 
   void initState() {
     setState(() {
       renameController.value = TextEditingValue(text: widget.content.name);
       currentContentRename = widget.content.name;
+
+      titleNoteController.value = TextEditingValue(text: widget.content.track.demoTitleNote);
+      currentTitleNote = widget.content.track.demoTitleNote;
     });
 
     super.initState();
@@ -273,6 +281,65 @@ class _SongContentItemState extends State<SongContentItem> {
           trailing: Wrap(
             direction: Axis.horizontal,
             children: [
+              // Set title note
+              Visibility(
+                visible: isHovering && widget.content.isDemo,
+                child: IconButton(
+                  onPressed: () {
+                    showDialog(context: context, builder: (context) {
+                      return StatefulBuilder(
+                        builder: (stfContext, stfSetState) {
+                          return AlertDialog(
+                            title: Text('Set title note', style: AppStyles.mediumText),
+                            backgroundColor: theme.colorScheme.secondaryContainer,
+                            content: TextField(
+                              decoration: InputDecoration(
+                                border: const OutlineInputBorder(),
+                                filled: true,
+                                fillColor: theme.colorScheme.secondaryContainer,
+                                hintText: 'Enter title note here',
+                              ),
+                              controller: titleNoteController,
+                              
+                              onChanged: (value) => {
+                                stfSetState(() {
+                                  currentTitleNote = value;
+                                })
+                              },
+                            ),
+                            actions: [
+                              // Confirm
+                              TextButton(
+                                onPressed: () {
+                                  appState.selectedTrack.settings!.set('demoTitleNote', currentTitleNote);
+                                  appState.selectedTrack.settings!.save();
+                                  appState.selectedTrack.demoTitleNote = currentTitleNote.isEmpty ? 'Demo' : currentTitleNote;
+                                  widget.updatePage();
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Confirm'),
+                              ),
+                              // Cancel
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  stfSetState(() {
+                                    currentTitleNote = '';
+                                    titleNoteController.value = const TextEditingValue(text: '');
+                                  });
+                                },
+                                child: const Text('Cancel'),
+                              )
+                            ],
+                          );
+                        }
+                      );
+                    });
+                  },
+                  icon: Icon(Icons.short_text, color: theme.colorScheme.secondaryContainer),
+                  tooltip: 'Set title note',
+                )
+              ),
               // Set as final
               Visibility(
                 visible: isHovering && widget.content.type == SongContentType.audio,
@@ -310,6 +377,7 @@ class _SongContentItemState extends State<SongContentItem> {
                       else {
                         widget.content.track.settings!.set('demo', path.basename(widget.content.file.path));
                       }
+                      widget.content.track.settings!.set('demoTitleNote', '');
                       widget.content.track.settings!.save();
 
                       widget.updatePage();
@@ -353,6 +421,15 @@ class _SongContentItemState extends State<SongContentItem> {
                                   File newFile = File(path.join(widget.content.file.parent.path, '$currentContentRename.${widget.content.file.path.split('.').last}'));
 
                                   if(newFile.existsSync()) return;
+
+                                  if(widget.content.isDemo) {
+                                    appState.selectedTrack.settings!.set('demo', path.basename(newFile.path));
+                                    appState.selectedTrack.settings!.save();
+                                  }
+                                  else if(widget.content.isFinal) {
+                                    appState.selectedTrack.settings!.set('final', path.basename(newFile.path));
+                                    appState.selectedTrack.settings!.save();
+                                  }
 
                                   widget.content.file.renameSync(newFile.path);
                                   widget.updatePage();
@@ -636,7 +713,7 @@ class EditTextNoteDialog extends StatefulWidget {
 }
 
 class _EditTextNoteDialogState extends State<EditTextNoteDialog> {
-  TextEditingController nameController = TextEditingController();
+  TextEditingController noteController = TextEditingController();
   String currentNoteText = '';
   
   @override
@@ -648,7 +725,7 @@ class _EditTextNoteDialogState extends State<EditTextNoteDialog> {
 
     setState(() {
       currentNoteText = widget.file.readAsStringSync();
-      nameController.value = TextEditingValue(text: currentNoteText);
+      noteController.value = TextEditingValue(text: currentNoteText);
     });
   }
 
@@ -680,9 +757,9 @@ class _EditTextNoteDialogState extends State<EditTextNoteDialog> {
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: theme.colorScheme.secondaryContainer,
-                      hintText: 'Make notes here',
+                      hintText: path.basename(widget.file.path) == 'lyrics.txt' ? 'Write lyrics here' : 'Make notes here',
                     ),
-                    controller: nameController,
+                    controller: noteController,
                     
                     onChanged: (value) => {
                       setState(() {
